@@ -4,9 +4,9 @@ import { styles } from '../styles/styles';
 
 const FolderItem = ({ folderName }) => {
   return (
-    <View style={styles.item}>
-      <Text style={styles.itemText}>{folderName}</Text>
-    </View>
+    <View style= { styles.folderItem } >
+    <Text style={ styles.folderItem }> { folderName } < /Text>
+      < /View>
   );
 };
 

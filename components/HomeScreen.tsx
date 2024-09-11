@@ -1,66 +1,168 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, Button, FlatList, TextInput, TouchableOpacity } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import { View, Text, FlatList, TouchableOpacity, Image, Modal, Alert } from 'react-native';
+import RNFS from 'react-native-fs';
+import DocumentItem from './DocumentItem';
+import AddDocumentForm from './AddDocumentForm';
 import { styles } from '../styles/styles';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import FolderItem from './FolderItem';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import { faFileCirclePlus } from '@fortawesome/free-solid-svg-icons';
 
-const HomeScreen = ({ navigation }) => {
-  const [folderName, setFolderName] = useState('');
-  const [folders, setFolders] = useState([]);
+const HomeScreen = () => {
+  const [documents, setDocuments] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [profile, setProfile] = useState({
+    name: 'Admin',
+    profileImage: require('../src/presentation/assets/foto.jpg'), // Imagen por defecto
+    loginCode: '0000',
+  });
+  const folderPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
+  const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
+  const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
+  const navigation = useNavigation();
 
-  useEffect(() => {
-    const loadFolders = async () => {
-      try {
-        const storedFolders = await AsyncStorage.getItem('folders');
-        if (storedFolders) {
-          setFolders(JSON.parse(storedFolders));
-        }
-      } catch (error) {
-        console.error("Error loading folders: ", error);
+  const loadProfile = async () => {
+    try {
+      const profileExists = await RNFS.exists(profilePath);
+      if (profileExists) {
+        const profileData = await RNFS.readFile(profilePath);
+        const { perfilUsuario } = JSON.parse(profileData);
+        setProfile(prevProfile => ({
+          ...prevProfile,
+          name: perfilUsuario.name || 'Admin',
+          profileImage: perfilUsuario.profileImage ? { uri: perfilUsuario.profileImage } : require('../src/presentation/assets/foto.jpg'),
+          loginCode: perfilUsuario.tokenInicio || '0000',
+        }));
       }
-    };
-
-    loadFolders();
-  }, []);
-
-  useEffect(() => {
-    const saveFolders = async () => {
-      try {
-        await AsyncStorage.setItem('folders', JSON.stringify(folders));
-      } catch (error) {
-        console.error("Error saving folders: ", error);
-      }
-    };
-
-    saveFolders();
-  }, [folders]);
-
-  const addFolder = () => {
-    if (folderName.trim()) {
-      setFolders([...folders, { name: folderName }]);
-      setFolderName('');
+    } catch (error) {
+      console.error("Error loading profile:", error);
+      Alert.alert("Error", "No se pudo cargar el perfil.");
     }
+  };
+
+  const loadDocuments = async () => {
+    try {
+      const filesDataExists = await RNFS.exists(filesJsonPath);
+      if (filesDataExists) {
+        const filesData = await RNFS.readFile(filesJsonPath);
+        const parsedFilesData = JSON.parse(filesData);
+
+        const loadedDocuments = parsedFilesData.archivos.map(doc => {
+          const documentPath = `${folderPath}/${doc.nombre}`;
+          return {
+            name: doc.nombre,
+            uri: documentPath,
+            ...doc,
+          };
+        });
+
+        setDocuments(loadedDocuments);
+      }
+    } catch (error) {
+      console.error("Error loading documents:", error);
+      Alert.alert("Error", "No se pudieron cargar los documentos.");
+    }
+  };
+
+  useFocusEffect(
+    useCallback(() => {
+      loadProfile();
+      loadDocuments();
+    }, [])
+  );
+
+  const addDocument = () => {
+    setShowForm(true);
+  };
+
+  const handleDocumentAdded = () => {
+    loadDocuments();
+    setShowForm(false);
+  };
+
+  const deleteDocument = async (filePath) => {
+    try {
+      const fileExists = await RNFS.exists(filePath);
+      if (!fileExists) {
+        Alert.alert("Error", "El archivo no existe.");
+        return;
+      }
+
+      await RNFS.unlink(filePath);
+      const jsonFilePath = filePath.replace(/\.[^/.]+$/, '.json');
+      if (await RNFS.exists(jsonFilePath)) {
+        await RNFS.unlink(jsonFilePath);
+      }
+      loadDocuments();
+    } catch (error) {
+      console.error("Error deleting document:", error);
+      Alert.alert("Error", "No se pudo eliminar el documento.");
+    }
+  };
+
+  const renameDocument = async (filePath, newFileName) => {
+    try {
+      const newFilePath = `${folderPath}/${newFileName}`;
+      await RNFS.moveFile(filePath, newFilePath);
+      const jsonFilePath = filePath.replace(/\.[^/.]+$/, '.json');
+      const newJsonFilePath = newFilePath.replace(/\.[^/.]+$/, '.json');
+      if (await RNFS.exists(jsonFilePath)) {
+        await RNFS.moveFile(jsonFilePath, newJsonFilePath);
+      }
+      loadDocuments();
+    } catch (error) {
+      console.error("Error renaming document:", error);
+      Alert.alert("Error", "No se pudo renombrar el documento.");
+    }
+  };
+
+  const shareDocument = () => {
+    Alert.alert("Compartir", "Funcionalidad de compartir no implementada.");
+  };
+
+  const handleProfileSave = (updatedProfile) => {
+    setProfile(updatedProfile);
+    loadProfile();
+  };
+
+  const navigateToDocumentDetail = (document) => {
+    navigation.navigate('DocumentDetail', {
+      document,
+      onGoBack: () => loadDocuments()  // Callback para recargar los documentos
+    });
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>Home Screen</Text>
-      <TextInput
-        style={styles.input}
-        value={folderName}
-        onChangeText={setFolderName}
-        placeholder="Folder Name"
-      />
-      <Button title="Add Folder" onPress={addFolder} />
+      <View style={styles.buttonContainer}>
+        <Text style={styles.title}>Documentos</Text>
+        <TouchableOpacity style={styles.addButton} onPress={addDocument}>
+          <FontAwesomeIcon icon={faFileCirclePlus} size={20} color="#fff" />
+          <Text style={styles.addButtonText}>Agregar</Text>
+        </TouchableOpacity>
+      </View>
       <FlatList
-        data={folders}
-        keyExtractor={(item, index) => index.toString()}
+        data={documents}
+        keyExtractor={(item) => item.name}
         renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => navigation.navigate('Folder', { folderName: item.name })}>
-            <FolderItem folderName={item.name} />
-          </TouchableOpacity>
+          <View style={styles.itemContainer}>
+            <DocumentItem 
+              documentName={item.name} 
+              uri={item.uri} 
+              onPress={() => navigateToDocumentDetail(item)}  // Navega al detalle con callback
+              onDelete={() => deleteDocument(item.uri)} 
+              onRename={(newName) => renameDocument(item.uri, newName)}
+              onShare={() => shareDocument(item.uri)}
+            />
+          </View>
         )}
       />
+      <Modal visible={showForm} animationType="slide">
+        <AddDocumentForm
+          onClose={() => setShowForm(false)}
+          onDocumentAdded={handleDocumentAdded}
+        />
+      </Modal>
     </View>
   );
 };

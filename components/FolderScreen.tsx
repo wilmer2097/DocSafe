@@ -1,48 +1,47 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, Button, FlatList, TouchableOpacity, Image, Alert } from 'react-native';
-import { styles } from '../styles/styles';
+import { View, Text, FlatList, TouchableOpacity, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DocumentPicker from 'react-native-document-picker';
 import { launchImageLibrary } from 'react-native-image-picker';
+import RNFS from 'react-native-fs';
 import DocumentItem from './DocumentItem';
+import { styles } from '../styles/styles';
 
-const FolderScreen = ({ route, navigation }) => {
-  const { folderName } = route.params;
+const FolderScreen = () => {
   const [documents, setDocuments] = useState([]);
+  const folderPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
 
   useEffect(() => {
-    const loadDocuments = async () => {
+    const createFolderAndLoadDocuments = async () => {
       try {
-        const storedDocuments = await AsyncStorage.getItem(folderName);
-        if (storedDocuments) {
-          setDocuments(JSON.parse(storedDocuments));
+        const folderExists = await RNFS.exists(folderPath);
+        if (!folderExists) {
+          await RNFS.mkdir(folderPath);
         }
+        const files = await RNFS.readDir(folderPath);
+        setDocuments(files);
       } catch (error) {
         console.error("Error loading documents: ", error);
       }
     };
 
-    loadDocuments();
-  }, [folderName]);
-
-  useEffect(() => {
-    const saveDocuments = async () => {
-      try {
-        await AsyncStorage.setItem(folderName, JSON.stringify(documents));
-      } catch (error) {
-        console.error("Error saving documents: ", error);
-      }
-    };
-
-    saveDocuments();
-  }, [documents, folderName]);
+    createFolderAndLoadDocuments();
+  }, []);
 
   const addDocument = async () => {
     try {
       const result = await DocumentPicker.pick({
         type: [DocumentPicker.types.allFiles],
       });
-      setDocuments([...documents, { name: result.name, uri: result.uri, type: 'document' }]);
+
+      const fileUri = result[0]?.uri;
+      const fileName = result[0]?.name;
+
+      const destPath = `${folderPath}/${fileName}`;
+      await RNFS.copyFile(fileUri, destPath);
+
+      const updatedDocuments = await RNFS.readDir(folderPath);
+      setDocuments(updatedDocuments);
     } catch (err) {
       if (DocumentPicker.isCancel(err)) {
         console.log('User cancelled the document picker');
@@ -52,76 +51,52 @@ const FolderScreen = ({ route, navigation }) => {
     }
   };
 
-  const addImage = () => {
-    launchImageLibrary({ mediaType: 'photo' }, (response) => {
-      if (response.didCancel) {
-        console.log('User cancelled image picker');
-      } else if (response.error) {
-        console.error('ImagePicker Error: ', response.error);
-      } else {
-        const source = { uri: response.assets[0].uri };
-        setDocuments([...documents, { name: response.assets[0].fileName, uri: source.uri, type: 'image' }]);
-      }
-    });
+  const deleteDocument = async (filePath) => {
+    try {
+      await RNFS.unlink(filePath);
+      const updatedDocuments = await RNFS.readDir(folderPath);
+      setDocuments(updatedDocuments);
+    } catch (error) {
+      console.error("Error deleting document: ", error);
+    }
   };
 
-  const deleteDocument = (index) => {
-    Alert.alert(
-      "Confirm Delete",
-      "Are you sure you want to delete this file?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        { text: "OK", onPress: () => {
-          const updatedDocuments = documents.filter((_, i) => i !== index);
-          setDocuments(updatedDocuments);
-        }}
-      ]
-    );
+  const renameDocument = async (filePath, newFileName) => {
+    const newFilePath = `${folderPath}/${newFileName}`;
+    try {
+      await RNFS.moveFile(filePath, newFilePath);
+      const updatedDocuments = await RNFS.readDir(folderPath);
+      setDocuments(updatedDocuments);
+    } catch (error) {
+      console.error("Error renaming document: ", error);
+    }
   };
 
-  const deleteFolder = () => {
-    Alert.alert(
-      "Confirm Delete",
-      "Are you sure you want to delete this folder and all its contents?",
-      [
-        {
-          text: "Cancel",
-          style: "cancel"
-        },
-        { text: "OK", onPress: async () => {
-          try {
-            await AsyncStorage.removeItem(folderName);
-            navigation.goBack();
-          } catch (error) {
-            console.error("Error deleting folder: ", error);
-          }
-        }}
-      ]
-    );
+  const shareDocument = async (filePath) => {
+    // Lógica para compartir el archivo
   };
 
   return (
     <View style={styles.container}>
-      <Text style={styles.header}>{folderName}</Text>
-      <Button title="Add Document" onPress={addDocument} />
-      <Button title="Add Image" onPress={addImage} />
+      <Text style={styles.title}>Documentos</Text>
+      <TouchableOpacity style={styles.addButton} onPress={addDocument}>
+        <Text style={styles.buttonText}>Agregar Documento</Text>
+      </TouchableOpacity>
       <FlatList
         data={documents}
-        keyExtractor={(item, index) => index.toString()}
-        renderItem={({ item, index }) => (
+        keyExtractor={(item) => item.name}
+        renderItem={({ item }) => (
           <View style={styles.itemContainer}>
-            <DocumentItem documentName={item.name} uri={item.uri} type={item.type} />
-            <TouchableOpacity onPress={() => deleteDocument(index)}>
-              <Text style={styles.deleteText}>Delete</Text>
-            </TouchableOpacity>
+            <DocumentItem 
+              documentName={item.name} 
+              uri={item.path} 
+              onDelete={() => deleteDocument(item.path)} 
+              onRename={(newName) => renameDocument(item.path, newName)}
+              onShare={() => shareDocument(item.path)}
+            />
           </View>
         )}
       />
-      <Button title="Delete Folder" onPress={deleteFolder} />
-      <Button title="Back to Home" onPress={() => navigation.goBack()} />
     </View>
   );
 };

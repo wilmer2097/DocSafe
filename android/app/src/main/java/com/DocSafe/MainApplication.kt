@@ -1,4 +1,4 @@
-package com.luffy
+package com.DocSafe
 
 import android.app.Application
 import com.facebook.react.PackageList

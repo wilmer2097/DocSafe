@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Ruta para los archivos en la carpeta de descargas -->
+    <external-path name="shared_files" path="Download/" />
+
+    <!-- Ruta para los archivos internos de la aplicación -->
+    <files-path name="internal_files" path="." />
+    <external-path name="download" path="Download/" />
+    <files-path name="my_files" path="." />
+    <!-- Ruta para archivos de almacenamiento externo accesibles por la app -->
+    <external-files-path name="external_files" path="." />
+</paths>
