@@ -9,7 +9,6 @@ const App = () => {
 
   const requestPermission = async (permission, title, message) => {
     try {
-      // Para Android 11+, manejar los permisos de manera diferente
       if (Platform.OS === 'android' && Platform.Version >= 30) {
         const status = await check(permission);
         if (status === RESULTS.DENIED || status === RESULTS.LIMITED) {
@@ -27,7 +26,6 @@ const App = () => {
           }
         }
       } else {
-        // Para versiones anteriores a Android 11 o si es necesario un chequeo adicional
         const status = await PermissionsAndroid.check(permission);
         if (!status) {
           const granted = await PermissionsAndroid.request(permission, {
@@ -61,12 +59,12 @@ const App = () => {
     if (Platform.OS === 'android') {
       const permissions = [];
 
-      // Añadir permisos dependiendo de la versión de Android
       if (Platform.Version >= 30) { // Android 11+
         permissions.push(
           { type: PERMISSIONS.ANDROID.READ_MEDIA_IMAGES, title: 'Permiso de lectura de imágenes', message: 'Esta aplicación necesita acceso a tus imágenes para leer archivos.' },
           { type: PERMISSIONS.ANDROID.READ_MEDIA_VIDEO, title: 'Permiso de lectura de videos', message: 'Esta aplicación necesita acceso a tus videos para leer archivos.' },
-          { type: PERMISSIONS.ANDROID.READ_MEDIA_AUDIO, title: 'Permiso de lectura de audio', message: 'Esta aplicación necesita acceso a tus archivos de audio.' }
+          { type: PERMISSIONS.ANDROID.READ_MEDIA_AUDIO, title: 'Permiso de lectura de audio', message: 'Esta aplicación necesita acceso a tus archivos de audio.' },
+          { type: PERMISSIONS.ANDROID.CAMERA, title: 'Permiso de cámara', message: 'Esta aplicación necesita acceso a tu cámara para tomar fotos.' }
         );
       } else { // Android 10 o inferior
         permissions.push(

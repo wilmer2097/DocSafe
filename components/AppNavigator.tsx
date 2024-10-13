@@ -2,10 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, SafeAreaView } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Linking } from 'react-native';
 import RNFS from 'react-native-fs';
 import HomeScreen from './HomeScreen';
 import HelpScreen from './HelpScreen';
+import ArchivedDocuments from './ArchivedDocuments';
 import LoginScreen from './LoginScreen';
 import ProfileScreen from './ProfileScreen';
 import DocumentDetail from './DocumentDetail';
@@ -47,32 +48,62 @@ const CustomDrawerContent = (props) => {
 
   return (
     <SafeAreaView style={styles.drawerContent}>
-      <View style={styles.profileSection}>
-        <TouchableOpacity onPress={() => props.navigation.navigate('Profile')}>
-          <Image source={profile.profileImage} style={styles.profileImage} />
-        </TouchableOpacity>
-        <Text style={styles.profileName}>{profile.name}</Text>
-        <Text style={styles.profileRole}>DocSafe</Text>
-      </View>
-      <View style={styles.menuItems}>
-        <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Documentos')}>
+    <View style={styles.profileSection}>
+      <TouchableOpacity style={styles.profileImageContainer} onPress={() => props.navigation.navigate('Profile')}>
+        <Image source={profile.profileImage} style={styles.profileImage} />
+      </TouchableOpacity>
+      <Text style={styles.profileName}>{profile.name}</Text>
+      <Text style={styles.profileRole}>DocSafe</Text>
+    </View>
+  
+    <View style={styles.menuItems}>
+      <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Documentos')}>
+        <View style={styles.iconAndText}>
           <FontAwesomeIcon icon={faFolder} size={20} color="#185abd" style={styles.menuIcon} />
           <Text style={styles.menuText}>Documentos</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Configuración')}>
+        </View>
+      </TouchableOpacity>
+  
+      <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Configuración')}>
+        <View style={styles.iconAndText}>
           <FontAwesomeIcon icon={faCog} size={20} color="#185abd" style={styles.menuIcon} />
           <Text style={styles.menuText}>Configuración</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Guía de Uso')}>
+        </View>
+      </TouchableOpacity>
+  
+      <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Guía de Uso')}>
+        <View style={styles.iconAndText}>
           <FontAwesomeIcon icon={faQuestionCircle} size={20} color="#185abd" style={styles.menuIcon} />
           <Text style={styles.menuText}>Ayuda</Text>
-        </TouchableOpacity>
-      </View>
-      <TouchableOpacity style={styles.logoutButton} onPress={() => props.navigation.navigate('Login')}>
-        <FontAwesomeIcon icon={faSignOutAlt} size={20} color="#ffffff" style={styles.menuIcon} />
-        <Text style={styles.logoutText}>Cerrar Sesión</Text>
+        </View>
       </TouchableOpacity>
-    </SafeAreaView>
+  
+      <TouchableOpacity 
+        style={styles.menuItem} 
+        onPress={() => Linking.openURL('https://solucionestecperu.com/contactos.html')}
+        accessibilityLabel="Creado por STEC Perú, fábrica de software, enlace a la página de contactos">
+        <View style={styles.iconAndText}>
+          <FontAwesomeIcon 
+            icon={faInfoCircle} 
+            size={20} 
+            color="#185abd" 
+            style={styles.menuIcon} 
+          />
+          <Text style={styles.menuText}>Creado Por</Text>
+        </View>
+        <View style={styles.infoContainer}>
+          <Text style={styles.creatorText}>STEC - Perú</Text>
+          <Text style={styles.subText}>Fábrica de software</Text>
+          <Text style={styles.yearText}>(c) 2024</Text>
+        </View>
+      </TouchableOpacity>
+    </View>
+  
+    <TouchableOpacity style={styles.logoutButton} onPress={() => props.navigation.navigate('Login')}>
+      <FontAwesomeIcon icon={faSignOutAlt} size={20} color="#ffffff" style={styles.menuIcon} />
+      <Text style={styles.logoutText}>Cerrar Sesión</Text>
+    </TouchableOpacity>
+  </SafeAreaView>
   );
 };
 
@@ -98,7 +129,7 @@ const DrawerNavigator = () => {
         name="DocSafe" 
         component={HomeScreen}
         options={{
-          title: 'Inicio',
+          title: 'Documentos',
           drawerIcon: ({ color, size }) => (
             <FontAwesomeIcon icon={faHome} color={color} size={size} />
           ),
@@ -137,6 +168,15 @@ const DrawerNavigator = () => {
         options={{
           drawerIcon: ({ color, size }) => (
             <FontAwesomeIcon icon={faQuestionCircle} color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen 
+        name="Archivados" 
+        component={ArchivedDocuments}  // Nueva pantalla
+        options={{
+          drawerIcon: ({ color, size }) => (
+            <FontAwesomeIcon icon={faFolder} color={color} size={size} />
           ),
         }}
       />
@@ -202,6 +242,11 @@ const AppNavigator = ({ initialRoute }) => {
             ),
           })}
         />
+        <Stack.Screen
+          name="ArchivedDocuments"
+          component={ArchivedDocuments}
+          options={{ title: 'Documentos Archivados' }}
+        />
       </Stack.Navigator>
     </NavigationContainer>
   );
@@ -210,7 +255,8 @@ const AppNavigator = ({ initialRoute }) => {
 const styles = StyleSheet.create({
   drawerContent: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f5f5f5', 
+    justifyContent: 'space-between',
   },
   profileSection: {
     alignItems: 'center',
@@ -219,13 +265,15 @@ const styles = StyleSheet.create({
     borderBottomColor: '#e0e0e0',
     backgroundColor: '#185abd',
   },
+  profileImageContainer: {
+    marginBottom: 10,
+  },
   profileImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
     borderColor: '#ffffff',
-    marginBottom: 10,
   },
   profileName: {
     color: '#ffffff',
@@ -241,17 +289,19 @@ const styles = StyleSheet.create({
     paddingTop: 20,
   },
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 15,
     paddingHorizontal: 20,
   },
+  iconAndText: {
+    flexDirection: 'row', 
+    alignItems: 'center', 
+  },
   menuIcon: {
-    marginRight: 15,
+    marginRight: 15,  
   },
   menuText: {
-    color: '#333333',
     fontSize: 16,
+    color: '#333333',
   },
   logoutButton: {
     flexDirection: 'row',
@@ -271,6 +321,26 @@ const styles = StyleSheet.create({
   headerIcon: {
     padding: 10,
   },
+  infoContainer: {
+    marginLeft: 25,         
+  },
+  creatorText: {
+    marginLeft: 10,
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#185abd'
+  },
+  subText: {
+    marginLeft: 10,
+    fontSize: 14,
+    color: '#666666',  
+  },
+  yearText: {
+    marginLeft: 10,
+    fontSize: 12,
+    color: '#999999',    
+  },
 });
+
 
 export default AppNavigator;

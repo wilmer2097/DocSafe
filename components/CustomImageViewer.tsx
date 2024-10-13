@@ -1,22 +1,84 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Image, StyleSheet, Modal, FlatList, TouchableOpacity, Animated, Alert, useWindowDimensions } from 'react-native';
+import { View, StyleSheet, Modal, FlatList, TouchableOpacity, Animated, Alert, useWindowDimensions } from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faTimes, faChevronLeft, faChevronRight, faShareAlt } from '@fortawesome/free-solid-svg-icons';
+import { faTimes, faShareAlt } from '@fortawesome/free-solid-svg-icons';
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
+import { PinchGestureHandler, PanGestureHandler, TapGestureHandler, GestureHandlerRootView } from 'react-native-gesture-handler';
+import Reanimated, { useAnimatedGestureHandler, useAnimatedStyle, useSharedValue, runOnJS, withSpring } from 'react-native-reanimated';
 
-const ImageViewer = ({ visible, images, initialIndex = 0, onClose, documentName }) => {
+const CustomImageViewer = ({ visible, images, initialIndex = 0, onClose, documentName }) => {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [documentData, setDocumentData] = useState(null); // Almacena los datos del documento
+  const [scrollEnabled, setScrollEnabled] = useState(true); // Controla el scroll del FlatList
+  const [documentData, setDocumentData] = useState(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const flatListRef = useRef(null);
   const { width, height } = useWindowDimensions();
+
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const doubleTapRef = useRef();
+
+  const pinchHandler = useAnimatedGestureHandler({
+    onActive: (event) => {
+      scale.value = event.scale;
+      if (event.scale > 1) {
+        runOnJS(setScrollEnabled)(false); // Desactiva el scroll cuando haces zoom
+      }
+    },
+    onEnd: () => {
+      if (scale.value <= 1) {
+        runOnJS(setScrollEnabled)(true); // Reactiva el scroll cuando el zoom es menor o igual a 1
+        scale.value = withSpring(1);
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+      }
+    },
+  });
+
+  const panHandler = useAnimatedGestureHandler({
+    onActive: (event) => {
+      if (scale.value > 1) {
+        translateX.value = event.translationX;
+        translateY.value = event.translationY;
+      }
+    },
+    onEnd: () => {
+      if (scale.value <= 1) {
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+      }
+    },
+  });
+
+  const doubleTapHandler = useAnimatedGestureHandler({
+    onActive: () => {
+      if (scale.value > 1) {
+        scale.value = withSpring(1);
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        runOnJS(setScrollEnabled)(true); // Reactiva el scroll cuando se restablece el zoom
+      } else {
+        scale.value = withSpring(2); // Doble toque aumenta el zoom
+        runOnJS(setScrollEnabled)(false); // Desactiva el scroll al hacer zoom
+      }
+    },
+  });
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+    ],
+  }));
 
   const viewabilityConfig = { viewAreaCoveragePercentThreshold: 50 };
 
   const onViewableItemsChanged = useRef(({ viewableItems }) => {
     if (viewableItems.length > 0) {
-      setCurrentIndex(viewableItems[0].index); // Actualiza el índice actual
+      setCurrentIndex(viewableItems[0].index);
     }
   }).current;
 
@@ -29,14 +91,13 @@ const ImageViewer = ({ visible, images, initialIndex = 0, onClose, documentName 
       }).start();
       loadDocumentData();
 
-      // Asegurarnos de que el FlatList se desplace al índice correcto
       setTimeout(() => {
         if (flatListRef.current) {
           flatListRef.current.scrollToIndex({ index: initialIndex, animated: true });
         }
-      }, 300); // Pequeño retraso para asegurar que el FlatList esté listo
+      }, 300);
     } else {
-      setCurrentIndex(initialIndex); // Reiniciar el índice cuando el modal se cierra
+      setCurrentIndex(initialIndex);
     }
   }, [visible, initialIndex]);
 
@@ -51,7 +112,7 @@ const ImageViewer = ({ visible, images, initialIndex = 0, onClose, documentName 
         const document = parsedFilesData.archivos.find(doc => doc.nombre === documentName);
 
         if (document) {
-          setDocumentData(document); // Guardar datos del documento
+          setDocumentData(document);
         }
       }
     } catch (error) {
@@ -94,7 +155,6 @@ const ImageViewer = ({ visible, images, initialIndex = 0, onClose, documentName 
       await Share.open(shareOptions);
     } catch (error) {
       console.error('Error al compartir la imagen:', error);
-      Alert.alert('Error', 'No se pudo compartir la imagen.');
     }
   };
 
@@ -114,28 +174,29 @@ const ImageViewer = ({ visible, images, initialIndex = 0, onClose, documentName 
   };
 
   const renderImage = ({ item }) => (
-    <View style={[styles.imageContainer, { width, height }]}>
-      <Image source={{ uri: item.uri }} style={[styles.image, { width, height }]} />
-    </View>
+    <GestureHandlerRootView>
+      <TapGestureHandler
+        onHandlerStateChange={doubleTapHandler}
+        numberOfTaps={2}
+        ref={doubleTapRef}
+      >
+        <Reanimated.View>
+          <PanGestureHandler onGestureEvent={panHandler}>
+            <Reanimated.View>
+              <PinchGestureHandler onGestureEvent={pinchHandler}>
+                <Reanimated.View style={[styles.imageContainer, { width, height }]}>
+                  <Reanimated.Image
+                    source={{ uri: item.uri }}
+                    style={[styles.image, { width, height }, animatedStyle]}
+                  />
+                </Reanimated.View>
+              </PinchGestureHandler>
+            </Reanimated.View>
+          </PanGestureHandler>
+        </Reanimated.View>
+      </TapGestureHandler>
+    </GestureHandlerRootView>
   );
-
-  const handlePrev = () => {
-    if (currentIndex > 0) {
-      setCurrentIndex(prevIndex => {
-        flatListRef.current.scrollToIndex({ index: prevIndex - 1, animated: true });
-        return prevIndex - 1;
-      });
-    }
-  };
-
-  const handleNext = () => {
-    if (currentIndex < images.length - 1) {
-      setCurrentIndex(prevIndex => {
-        flatListRef.current.scrollToIndex({ index: prevIndex + 1, animated: true });
-        return prevIndex + 1;
-      });
-    }
-  };
 
   return (
     <Modal
@@ -160,22 +221,11 @@ const ImageViewer = ({ visible, images, initialIndex = 0, onClose, documentName 
             { length: width, offset: width * index, index }
           )}
           style={styles.flatList}
+          scrollEnabled={scrollEnabled} // Controla el scroll con base en el zoom
         />
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
           <FontAwesomeIcon icon={faTimes} size={24} color="#ffffff" />
         </TouchableOpacity>
-        <View style={styles.navigationButtons}>
-          {currentIndex > 0 && (
-            <TouchableOpacity style={styles.navButton} onPress={handlePrev}>
-              <FontAwesomeIcon icon={faChevronLeft} size={24} color="#ffffff" />
-            </TouchableOpacity>
-          )}
-          {currentIndex < images.length - 1 && (
-            <TouchableOpacity style={styles.navButton} onPress={handleNext}>
-              <FontAwesomeIcon icon={faChevronRight} size={24} color="#ffffff" />
-            </TouchableOpacity>
-          )}
-        </View>
         <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
           <FontAwesomeIcon icon={faShareAlt} size={24} color="#ffffff" />
         </TouchableOpacity>
@@ -209,19 +259,6 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 25,
   },
-  navigationButtons: {
-    position: 'absolute',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-    paddingHorizontal: 20,
-    top: '50%',
-  },
-  navButton: {
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    padding: 10,
-    borderRadius: 25,
-  },
   shareButton: {
     position: 'absolute',
     bottom: 40,
@@ -232,4 +269,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ImageViewer;
+export default CustomImageViewer;

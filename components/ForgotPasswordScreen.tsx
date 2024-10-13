@@ -1,9 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet } from 'react-native';
 import RNFS from 'react-native-fs';
+import CustomAlert from './CustomAlert'; // Importa tu componente CustomAlert
 
 const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
+  const [newToken, setNewToken] = useState(null); // Estado para almacenar el nuevo token
+  const [showAlert, setShowAlert] = useState(false); // Estado para controlar la visibilidad del CustomAlert
 
   const handlePasswordReset = async () => {
     const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
@@ -13,17 +16,16 @@ const ForgotPasswordScreen = ({ navigation }) => {
       const userProfile = JSON.parse(profileData).perfilUsuario;
 
       if (userProfile.correo === email) {
-        const newToken = generateToken();
-        userProfile.loginCode = newToken;
+        const token = generateToken();
+        userProfile.loginCode = token;
 
         await RNFS.writeFile(profilePath, JSON.stringify({ perfilUsuario: userProfile }), 'utf8');
-        Alert.alert('Éxito', `Tu nuevo código de acceso es: ${newToken}`);
-        navigation.navigate('Login');
+        setNewToken(token); // Guardar el nuevo token en el estado
+        setShowAlert(true); // Mostrar el CustomAlert
       } else {
-        Alert.alert('Error', 'El correo ingresado no coincide con el correo registrado.');
+        setShowAlert(true);
       }
     } catch (error) {
-      Alert.alert('Error', 'No se pudo procesar la solicitud.');
       console.error('Error:', error);
     }
   };
@@ -32,20 +34,37 @@ const ForgotPasswordScreen = ({ navigation }) => {
     return Math.floor(1000 + Math.random() * 9000).toString();
   };
 
+  const onCloseAlert = () => {
+    setShowAlert(false);
+    navigation.navigate('Login'); // Navega de vuelta al login después de cerrar el modal
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.title}>Recuperar Token ID</Text>
       <TextInput
-      style={styles.input}
-      placeholder="Correo electrónico"
-      value={email}
-      onChangeText={(text) => setEmail(text.toLowerCase())} // Convierte el texto a minúsculas
-      keyboardType="email-address"
-      placeholderTextColor="#999"
+        style={styles.input}
+        placeholder="Correo electrónico"
+        value={email}
+        onChangeText={(text) => setEmail(text.toLowerCase())} // Convierte el texto a minúsculas
+        keyboardType="email-address"
+        placeholderTextColor="#999"
       />
       <TouchableOpacity style={styles.button} onPress={handlePasswordReset}>
         <Text style={styles.buttonText}>Generar nuevo token</Text>
       </TouchableOpacity>
+
+      {/* Mostrar CustomAlert cuando showAlert es true */}
+      {showAlert && (
+        <CustomAlert
+          visible={showAlert}
+          onClose={onCloseAlert}
+          title="Nuevo Token Generado"
+          message="Tu nuevo código de acceso es:"
+          token={newToken} // Mostrar el nuevo token en el modal
+          onAccept={onCloseAlert}
+        />
+      )}
     </View>
   );
 };

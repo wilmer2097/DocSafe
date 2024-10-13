@@ -6,7 +6,7 @@ import AddDocumentForm from './AddDocumentForm';
 import { styles } from '../styles/styles';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faFileCirclePlus } from '@fortawesome/free-solid-svg-icons';
+import { faFileCirclePlus, faEye } from '@fortawesome/free-solid-svg-icons';
 
 const HomeScreen = () => {
   const [documents, setDocuments] = useState([]);
@@ -47,7 +47,12 @@ const HomeScreen = () => {
         const filesData = await RNFS.readFile(filesJsonPath);
         const parsedFilesData = JSON.parse(filesData);
 
-        const loadedDocuments = parsedFilesData.archivos.map(doc => {
+        // Filtrar solo los documentos que tienen el campo share: false
+        const filteredDocuments = parsedFilesData.archivos
+          .filter(doc => doc.share === false) // Filtro de archivos con share: false
+          .sort((a, b) => a.nombre.toLowerCase().localeCompare(b.nombre.toLowerCase())); // Ordenar alfabéticamente por nombre del archivo
+
+        const loadedDocuments = filteredDocuments.map(doc => {
           const documentPath = `${folderPath}/${doc.nombre}`;
           return {
             name: doc.nombre,
@@ -135,10 +140,13 @@ const HomeScreen = () => {
   return (
     <View style={styles.container}>
       <View style={styles.buttonContainer}>
-        <Text style={styles.title}>Documentos</Text>
         <TouchableOpacity style={styles.addButton} onPress={addDocument}>
           <FontAwesomeIcon icon={faFileCirclePlus} size={20} color="#fff" />
           <Text style={styles.addButtonText}>Agregar</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.archivedButton} onPress={() => navigation.navigate('ArchivedDocuments')}>
+        <FontAwesomeIcon icon={faEye} size={20} color="#fff" />  
+        <Text style={styles.archivedButtonText}>Archivados</Text>
         </TouchableOpacity>
       </View>
       <FlatList

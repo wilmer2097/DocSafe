@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, View, Text, TextInput, TouchableOpacity, Image, StyleSheet, Alert, KeyboardAvoidingView } from 'react-native';
 import RNFS from 'react-native-fs';
+import CustomAlert from './CustomAlert';
 
 const ProfileScreen = ({ navigation }) => {
   const [profile, setProfile] = useState({
@@ -8,14 +9,15 @@ const ProfileScreen = ({ navigation }) => {
     name: '',
     profileImage: null,
     loginCode: '',
-    grupo: '',
     ciudad: '',
     telefono: '',
     correo: '',
   });
-  
+
   const [firstTime, setFirstTime] = useState(true);
   const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
+  const [errorTelefono, setErrorTelefono] = useState(null);
+  const [showAlert, setShowAlert] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -25,11 +27,11 @@ const ProfileScreen = ({ navigation }) => {
           const profileData = await RNFS.readFile(profilePath);
           const savedProfile = JSON.parse(profileData).perfilUsuario;
           setProfile(prev => ({ ...prev, ...savedProfile }));
-          setFirstTime(false);  // Assume it's not the first time if profile exists
+          setFirstTime(false);
         } else {
           const generatedLoginCode = Math.floor(1000 + Math.random() * 9000).toString();
           setProfile(prev => ({ ...prev, loginCode: generatedLoginCode }));
-          setFirstTime(true);  // First-time setup
+          setFirstTime(true);
         }
       } catch (error) {
         console.error('Error loading profile:', error);
@@ -44,6 +46,20 @@ const ProfileScreen = ({ navigation }) => {
     return pattern.test(email);
   };
 
+  const validateTelefono = (telefono) => {
+    if (telefono.length !== 9) {
+      setErrorTelefono('El número de teléfono debe contener exactamente 9 dígitos.');
+      return false;
+    }
+    const pattern = /^\d{9}$/;
+    if (!pattern.test(telefono)) {
+      setErrorTelefono('El número de teléfono debe contener solo dígitos.');
+      return false;
+    }
+    setErrorTelefono(null);
+    return true;
+  };
+
   const handleSaveProfile = async () => {
     if (!profile.name.trim() || profile.loginCode.length !== 4) {
       Alert.alert('Error', 'Nombre y un código de acceso de 4 dígitos son requeridos.');
@@ -55,23 +71,42 @@ const ProfileScreen = ({ navigation }) => {
       return;
     }
 
+    if (!validateTelefono(profile.telefono)) {
+      Alert.alert('Error', errorTelefono);
+      return;
+    }
+
     try {
       const newProfile = JSON.stringify({ perfilUsuario: profile });
       await RNFS.writeFile(profilePath, newProfile, 'utf8');
-      Alert.alert('Éxito', `Perfil actualizado exitosamente. Tu código de acceso es: ${profile.loginCode}`);
-      navigation.navigate('Login'); 
+      setShowAlert(true);
     } catch (error) {
       console.error('Error al guardar el perfil:', error);
       Alert.alert('Error', 'No se pudo guardar el perfil: ' + error.message);
     }
   };
 
-
   const handleChange = (key, value) => {
     if (key === 'correo') {
-      value = value.toLowerCase(); // Convierte el correo a minúsculas
+      value = value.toLowerCase();
     }
-    setProfile(prev => ({ ...prev, [key]: value }));
+  
+    if (key === 'telefono') {
+      // Limpiar el número de teléfono para asegurar que solo queden 9 dígitos
+      // Eliminar caracteres no numéricos y mantener solo los últimos 9 dígitos
+      const cleanedValue = value.replace(/\D+/g, '').slice(-9);
+      setProfile(prev => ({ ...prev, [key]: cleanedValue }));
+    } else {
+      setProfile(prev => ({ ...prev, [key]: value }));
+    }
+  };
+
+  const onCloseAlert = () => {
+    setShowAlert(false);
+  };
+
+  const onAcceptAlert = () => {
+    navigation.navigate('Login');
   };
 
   return (
@@ -82,10 +117,8 @@ const ProfileScreen = ({ navigation }) => {
           style={styles.profileImage}
         />
 
-        
-        {/* Identificador Personal */}
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Identificador Personal</Text>
+          <Text style={styles.label}>Nombre</Text>
           <TextInput
             style={styles.input}
             placeholder="Nombre"
@@ -94,7 +127,6 @@ const ProfileScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Correo */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Correo</Text>
           <TextInput
@@ -106,7 +138,6 @@ const ProfileScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Teléfono */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Teléfono</Text>
           <TextInput
@@ -115,13 +146,13 @@ const ProfileScreen = ({ navigation }) => {
             value={profile.telefono}
             onChangeText={(text) => handleChange('telefono', text)}
             keyboardType="phone-pad"
+            maxLength={12}
           />
+          {errorTelefono && <Text style={styles.error}>{errorTelefono}</Text>}
         </View>
 
-        {/* The following fields are only shown after the first save */}
         {!firstTime && (
           <>
-            {/* Ciudad */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Ciudad</Text>
               <TextInput
@@ -131,27 +162,14 @@ const ProfileScreen = ({ navigation }) => {
                 onChangeText={(text) => handleChange('ciudad', text)}
               />
             </View>
-
-            {/* Grupo */}
             <View style={styles.inputContainer}>
-              <Text style={styles.label}>Grupo</Text>
+              <Text style={styles.label}>Estado</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Grupo"
-                value={profile.grupo}
-                onChangeText={(text) => handleChange('grupo', text)}
+                value={profile.estado}
+                editable={false}
               />
             </View>
-            {/* Estado (Fixed and Non-editable) */}
-            <View style={styles.inputContainer}>
-            <Text style={styles.label}>Estado</Text>
-            <TextInput
-              style={styles.input}
-              value={profile.estado}
-              editable={false}
-            />
-          </View>
-            {/* Código de acceso (Not editable, shown after first save) */}
             <View style={styles.inputContainer}>
               <Text style={styles.label}>Código de acceso</Text>
               <TextInput
@@ -168,6 +186,16 @@ const ProfileScreen = ({ navigation }) => {
           <Text style={styles.buttonText}>Guardar</Text>
         </TouchableOpacity>
       </ScrollView>
+      {showAlert && (
+        <CustomAlert
+          visible={showAlert}
+          onClose={onCloseAlert}
+          onAccept={onAcceptAlert}
+          title="Perfil Guardado"
+          message="Tu perfil ha sido guardado exitosamente."
+          token={profile.loginCode}
+        />
+      )}
     </KeyboardAvoidingView>
   );
 };

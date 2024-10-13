@@ -15,15 +15,16 @@ export const styles = StyleSheet.create({
   addButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#2f7fc2',
+    backgroundColor: '#155abd',
     paddingVertical: 10,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     borderRadius: 10,
     elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.3,
     shadowRadius: 3.84,
+    marginRight: 10,
   },
   addButtonText: {
     color: '#fff',
@@ -34,8 +35,10 @@ export const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 20,
+    justifyContent: 'flex-end',
+    paddingLeft: 20,
+    backgroundColor: '#f0f0f0',
+    marginBottom: 20
   },
   itemContainer: {
     flexDirection: 'row',
@@ -45,7 +48,7 @@ export const styles = StyleSheet.create({
   documentNameContainer: {
     fontSize: 18,
     color: '#555',
-    flexShrink: 1, // Ensure text wraps within its container
+    flexShrink: 1,
   },
   input: {
     height: 50,
@@ -56,5 +59,24 @@ export const styles = StyleSheet.create({
     fontSize: 16,
     marginBottom: 20,
     backgroundColor: '#fff',
+  },
+  archivedButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#155abd',
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 10,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3.84,
+  },
+  archivedButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    marginLeft: 10,
+    fontWeight: '500',
   },
 });

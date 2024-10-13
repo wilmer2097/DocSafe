@@ -2,9 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, Switch, Alert, Image, StyleSheet, ScrollView, Modal } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import DocumentPicker from 'react-native-document-picker';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import ImageCropPicker from 'react-native-image-crop-picker';
 import RNFS from 'react-native-fs';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faSave, faTimesCircle, faCalendarAlt, faFileAlt, faShareAlt, faLink, faImage, faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileVideo, faFileAudio, faFileArchive, faFileCirclePlus, faEdit, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
+import { faSave, faTimesCircle, faCalendarAlt, faFileAlt, faShareAlt, faLink, faImage, faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileVideo, faFileAudio, faFileArchive, faFileCirclePlus, faEdit, faTrashAlt, faCamera, faImages, faFile } from '@fortawesome/free-solid-svg-icons';
 import ImageViewer from './ImageViewer';
 
 const generateUUID = () => {
@@ -19,32 +21,31 @@ const getIconForFileType = (fileName) => {
   const extension = fileName.split('.').pop().toLowerCase();
   switch (extension) {
     case 'pdf':
-      return faFilePdf;
+      return { icon: faFilePdf, color: '#f40000' };
     case 'doc':
     case 'docx':
-      return faFileWord;
+      return { icon: faFileWord, color: '#1e90ff' };
     case 'xls':
     case 'xlsx':
-      return faFileExcel;
+      return { icon: faFileExcel, color: '#28a745' };
     case 'ppt':
     case 'pptx':
-      return faFilePowerpoint;
+      return { icon: faFilePowerpoint, color: '#ff6347' };
     case 'jpg':
     case 'jpeg':
     case 'png':
-      return faImage;
-    case 'mp4':
-    case 'mov':
-    case 'avi':
-      return faFileVideo;
-    case 'mp3':
-    case 'wav':
-      return faFileAudio;
+      return { icon: faImage, color: '#ffb100' };
     case 'zip':
     case 'rar':
-      return faFileArchive;
+      return { icon: faFileArchive, color: '#f39c12' };
+    case 'mp4':
+    case 'mkv':
+      return { icon: faFileVideo, color: '#f1c40f' };
+    case 'mp3':
+    case 'wav':
+      return { icon: faFileAudio, color: '#8e44ad' };
     default:
-      return faFileAlt;
+      return { icon: faFileAlt, color: '#6c757d' };  // Ícono y color genérico
   }
 };
 
@@ -53,152 +54,276 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   const [secondaryDocument, setSecondaryDocument] = useState(null);
   const [documentName, setDocumentName] = useState('');
   const [share, setShare] = useState(false);
-  const [expiryDate, setExpiryDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() + 1))); // Default to one year in the future
+  const [expiryDate, setExpiryDate] = useState(new Date(new Date().setFullYear(new Date().getFullYear() + 1)));
   const [description, setDescription] = useState('');
   const [url, setUrl] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [currentImageUri, setCurrentImageUri] = useState(0);
+  const [isActionSheetVisible, setIsActionSheetVisible] = useState(false); 
+  const [fileType, setFileType] = useState(null);
 
-  const handlePickDocument = async (type) => {
+  // Funciones para manejar las opciones seleccionadas
+  const handleActionSheetPress = (option) => {
+    setIsActionSheetVisible(false);
+    if (option === 'camera') openCamera(fileType);
+    if (option === 'gallery') openGallery(fileType);
+    if (option === 'files') openDocumentPicker(fileType);
+  };
+
+  // Abrir la cámara con la funcionalidad de recorte
+  const openCamera = async (type) => {
     try {
-      const result = await DocumentPicker.pick({
-        type: [DocumentPicker.types.allFiles],
+      const image = await ImageCropPicker.openCamera({
+        cropping: true,
+        freeStyleCropEnabled: true,
+        includeBase64: false,
+        compressImageQuality: 0.8,
       });
-      if (result && result[0]) {
-        if (type === 'principal') {
-          setPrincipalDocument(result[0]);
-        } else {
-          setSecondaryDocument(result[0]);
-        }
+  
+      // Genera un nombre único basado en la fecha y la hora actual para las fotos de la cámara
+      const uniqueFileName = `camera_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+  
+      if (type === 'principal') {
+        setPrincipalDocument({ uri: image.path, name: uniqueFileName, type: image.mime });
+      } else if (type === 'secondary') {
+        setSecondaryDocument({ uri: image.path, name: uniqueFileName, type: image.mime });
       }
     } catch (error) {
-      if (DocumentPicker.isCancel(error)) {
-        console.log('User canceled the picker');
+      console.log('Error capturando la imagen con la cámara', error);
+    }
+  };
+  const handleCaptureImage = async () => {
+    const options = {
+      mediaType: 'photo',
+      saveToPhotos: true, // Guarda en la galería si es necesario
+    };
+    const result = await launchCamera(options);
+
+    if (result.assets && result.assets.length > 0) {
+      // Genera un nombre único basado en la fecha y hora actual
+      const fileName = `camera_photo_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`; 
+      const filePath = result.assets[0].uri;
+      const newFilePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
+  
+      // Guarda la imagen en la carpeta DocSafe
+      await RNFS.copyFile(filePath, newFilePath);
+  
+      const updatedFiles = [...documentFiles];
+      if (!updatedFiles[0]) {
+        updatedFiles[0] = newFilePath;
       } else {
-        Alert.alert('Error', 'No se pudo seleccionar el documento.');
+        updatedFiles.push(newFilePath);
       }
+  
+      setDocumentFiles(updatedFiles);
+      Alert.alert('Éxito', 'Foto capturada y guardada correctamente.');
     }
   };
 
-  const handleFilePress = (file, index) => {
-    const isImage = file?.type?.startsWith('image/');
-    if (isImage) {
-      setCurrentImageUri(index);
-      setIsImageViewerVisible(true);
-    } else {
-      openDocument(file);
-    }
-  };
-
-  const deleteFile = (fileType) => {
-    if (fileType === 'principal') {
-      setPrincipalDocument(null);
-    } else {
-      setSecondaryDocument(null);
-    }
-  };
-
-  const handleFileOperation = async (operationType, fileType) => {
+  // Abrir la galería
+  const openGallery = async (type) => {
     try {
-      const result = await DocumentPicker.pick({
-        type: [DocumentPicker.types.allFiles],
+      const image = await ImageCropPicker.openPicker({
+        cropping: true,
+        freeStyleCropEnabled: true,
+        includeBase64: false,
+        compressImageQuality: 0.8,
       });
-
-      if (result && result[0]) {
-        if (operationType === 'edit') {
-          if (fileType === 'principal') {
-            setPrincipalDocument(result[0]);
-          } else {
-            setSecondaryDocument(result[0]);
-          }
-        } else if (operationType === 'add') {
-          if (!principalDocument) {
-            setPrincipalDocument(result[0]);
-          } else {
-            setSecondaryDocument(result[0]);
-          }
-        }
+  
+      // Preserva el nombre del archivo original para las imágenes de la galería
+      const originalFileName = image.filename || `gallery_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+  
+      if (type === 'principal') {
+        setPrincipalDocument({ uri: image.path, name: originalFileName, type: image.mime });
+      } else if (type === 'secondary') {
+        setSecondaryDocument({ uri: image.path, name: originalFileName, type: image.mime });
       }
     } catch (error) {
-      if (!DocumentPicker.isCancel(error)) {
-        console.error(`Error al ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo:`, error);
-        Alert.alert('Error', `No se pudo ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo.`);
+      console.log('Error seleccionando la imagen de la galería', error);
+    }
+  };
+  
+
+// Abrir el selector de documentos
+const openDocumentPicker = async (type) => {
+  try {
+    const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
+    if (result && result[0]) {
+      if (type === 'principal') {
+        setPrincipalDocument(result[0]);
+      } else if (type === 'secondary') {
+        setSecondaryDocument(result[0]);
       }
     }
-  };
-
-  const renderDocumentFile = (file, fileType, index) => {
-    if (!file) {
-      return renderAddFileIcon(fileType === 'principal' ? 'Principal/Anverso' : 'Secundario/Reverso');
+  } catch (error) {
+    if (!DocumentPicker.isCancel(error)) {
+      Alert.alert('Error', 'No se pudo seleccionar el documento.');
     }
+  }
+};
 
-    const icon = getIconForFileType(file.name);
+const handlePickDocument = async (type) => {
+  try {
+    const result = await DocumentPicker.pick({
+      type: [DocumentPicker.types.allFiles],
+    });
+    if (result && result[0]) {
+      if (type === 'principal') {
+        setPrincipalDocument(result[0]);
+      } else if (type === 'secondary') {
+        setSecondaryDocument(result[0]);
+      }
+    }
+  } catch (error) {
+    if (!DocumentPicker.isCancel(error)) {
+      Alert.alert('Error', 'No se pudo seleccionar el documento.');
+    }
+  }
+};
 
-    return (
-      <View key={index} style={styles.documentSection}>
-        <Text style={styles.sectionLabel}>{fileType === 'principal' ? 'Principal/Anverso' : 'Secundario/Reverso'}</Text>
-        <TouchableOpacity style={styles.fileContainer} onPress={() => handleFilePress(file, index)}>
-          {icon === faImage ? (
-            <Image source={{ uri: file.uri }} style={styles.filePreview} />
-          ) : (
-            <FontAwesomeIcon icon={icon} size={50} color="#007BFF" />
-          )}
+const handleFilePress = (file, index) => {
+  const isImage = file?.type?.startsWith('image/');
+  if (isImage) {
+    setCurrentImageUri(index);
+    setIsImageViewerVisible(true);
+  }
+};
+
+const deleteFile = (fileType) => {
+  if (fileType === 'principal') {
+    setPrincipalDocument(null);
+  } else if (fileType === 'secondary') {
+    setSecondaryDocument(null);
+  }
+};
+
+// Función para manejar la operación de agregar o reemplazar archivos
+const handleFileOperation = async (operationType, file, index) => {
+  try {
+    const result = await DocumentPicker.pick({
+      type: [DocumentPicker.types.images], // Cambia el tipo de archivo si es necesario
+    });
+
+    if (result && result.length > 0) {
+      const fileName = result[0].name; // Obtiene el nombre original del archivo
+      const newFilePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
+
+      // Copia el archivo seleccionado a la ruta de destino
+      await RNFS.copyFile(result[0].uri, newFilePath);
+
+      if (operationType === 'edit') {
+        const updatedFiles = [...documentFiles];
+        updatedFiles[index] = newFilePath;
+        setDocumentFiles(updatedFiles);
+        Alert.alert('Éxito', 'Archivo actualizado correctamente.');
+      } else if (operationType === 'add') {
+        const updatedFiles = [...documentFiles];
+        if (!updatedFiles[0]) {
+          updatedFiles[0] = newFilePath;
+        } else {
+          updatedFiles.push(newFilePath);
+        }
+
+        setDocumentFiles(updatedFiles);
+        Alert.alert('Éxito', 'Archivo agregado correctamente.');
+      }
+    }
+  } catch (error) {
+    if (!DocumentPicker.isCancel(error)) {
+      console.error(`Error al ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo:`, error);
+      Alert.alert('Error', `No se pudo ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo.`);
+    }
+  }
+};
+
+
+const renderDocumentFile = (file, fileType, index) => {
+  if (!file) {
+    return renderAddFileIcon(fileType === 'principal' ? 'Principal/Anverso' : 'Secundario/Reverso');
+  }
+  const { icon, color } = getIconForFileType(file.name);
+  const isImage = file?.type?.startsWith('image/');
+
+  return (
+    <View key={index} style={styles.documentSection}>
+      <Text style={styles.sectionLabel}>{fileType === 'principal' ? 'Principal/Anverso' : 'Secundario/Reverso'}</Text>
+      <TouchableOpacity onPress={() => handleFilePress(file, index)} style={styles.fileContainer}>
+        {isImage ? (
+          <Image source={{ uri: file.uri }} style={styles.filePreview} />  // Vista previa si es imagen
+        ) : (
+          <FontAwesomeIcon icon={icon} size={50} color={color} />  // Ícono si no es imagen con color
+        )}
+      </TouchableOpacity>
+      <View style={styles.iconActions}>
+        <TouchableOpacity onPress={() => handlePickDocument(fileType)} style={styles.iconButton}>
+          <FontAwesomeIcon icon={faEdit} size={20} color="#185abd" />
         </TouchableOpacity>
-        <View style={styles.iconActions}>
-          <TouchableOpacity onPress={() => handleFileOperation('edit', fileType)} style={styles.iconButton}>
-            <FontAwesomeIcon icon={faEdit} size={20} color="#185abd" />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => deleteFile(fileType)} style={styles.iconButton}>
-            <FontAwesomeIcon icon={faTrashAlt} size={20} color="#cc0000" />
-          </TouchableOpacity>
-        </View>
+        <TouchableOpacity onPress={() => deleteFile(fileType)} style={styles.iconButton}>
+          <FontAwesomeIcon icon={faTrashAlt} size={20} color="#cc0000" />
+        </TouchableOpacity>
       </View>
-    );
+    </View>
+  );
   };
+
 
   const renderAddFileIcon = (label) => (
     <View style={styles.documentSection}>
       <Text style={styles.sectionLabel}>{label}</Text>
-      <TouchableOpacity style={styles.fileContainer} onPress={() => handlePickDocument(label === 'Principal/Anverso' ? 'principal' : 'secondary')}>
+      <TouchableOpacity
+        onPress={() => {
+          setIsActionSheetVisible(true); // Muestra las opciones de archivo
+          setFileType(label === 'Principal/Anverso' ? 'principal' : 'secondary'); // Establece si es principal o secundario
+        }}
+        style={styles.fileContainer}
+      >
         <FontAwesomeIcon icon={faFileCirclePlus} size={50} color="#185abd" />
       </TouchableOpacity>
     </View>
   );
-
+  const validateURL = (url) => {
+    const pattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
+    return pattern.test(url);
+  };
+  
   const handleSave = async () => {
-    // Check if either the principal document or URL is provided
     if (!principalDocument && !url) {
       Alert.alert('Error', 'Debe seleccionar al menos un documento principal o proporcionar una URL.');
       return;
     }
-
+  
+    if (url && !validateURL(url)) {
+      Alert.alert('Error', 'La URL del documento no es válida.');
+      return;
+    }
+  
     if (!documentName) {
       Alert.alert('Error', 'Debe proporcionar un nombre para el documento.');
       return;
     }
-
+  
     const folderPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
     const assetsPath = `${RNFS.DocumentDirectoryPath}/assets`;
+    
+    // Asegúrate de que los directorios existan antes de escribir en ellos
     await RNFS.mkdir(folderPath);
     await RNFS.mkdir(assetsPath);
-
+  
     const imagenes = [];
-    let principalFileName = principalDocument?.name || '';
-
+  
     if (principalDocument) {
-      const principalPath = `${folderPath}/${principalFileName}`;
-      await RNFS.moveFile(principalDocument.uri, principalPath);
-      imagenes.push(principalFileName);
+      const principalFilePath = `${folderPath}/${principalDocument.name}`;
+      await RNFS.moveFile(principalDocument.uri, principalFilePath);
+      imagenes.push(principalDocument.name);
     }
-
+  
     if (secondaryDocument) {
-      const secondaryFileName = secondaryDocument.name;
-      const secondaryPath = `${folderPath}/${secondaryFileName}`;
-      await RNFS.moveFile(secondaryDocument.uri, secondaryPath);
-      imagenes.push(secondaryFileName);
+      const secondaryFilePath = `${folderPath}/${secondaryDocument.name}`;
+      await RNFS.moveFile(secondaryDocument.uri, secondaryFilePath);
+      imagenes.push(secondaryDocument.name);
     }
-
+  
     const documentId = generateUUID();
     const metadata = {
       id_archivo: documentId,
@@ -208,21 +333,31 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       expiryDate: expiryDate.toISOString(),
       share: share,
       imagenes: imagenes,
+      fecha_creacion: new Date().toISOString(),
     };
-
+  
     const metadataPath = `${assetsPath}/archivos.json`;
+    
     let filesData = { archivos: [] };
+    
+    // Verifica si el archivo ya existe antes de leerlo
     if (await RNFS.exists(metadataPath)) {
       const existingData = await RNFS.readFile(metadataPath);
       filesData = JSON.parse(existingData);
     }
+    
     filesData.archivos.push(metadata);
+    
+    // Escribe los datos en el archivo JSON
     await RNFS.writeFile(metadataPath, JSON.stringify(filesData));
-
+  
     Alert.alert('Éxito', 'Documento agregado con éxito.');
     onDocumentAdded();
     onClose();
   };
+  
+  
+  
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
@@ -263,13 +398,13 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       <View style={styles.inputContainer}>
         <Text style={styles.label}>URL del documento:</Text>
         <View style={styles.urlContainer}>
-          <TextInput
-            style={[styles.input, styles.urlInput]}
-            placeholder="URL (Opcional)"
-            value={url}
-            onChangeText={setUrl}
-            placeholderTextColor="#9a9a9a"
-          />
+              <TextInput
+              style={[styles.input, styles.urlInput]}
+              placeholder="URL (Opcional)"
+              value={url}
+              onChangeText={(text) => setUrl(text.toLowerCase())} // Convierte el texto a minúsculas
+              placeholderTextColor="#9a9a9a"
+            />
           <FontAwesomeIcon icon={faLink} size={24} color="#185abd" />
         </View>
       </View>
@@ -294,7 +429,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
           )}
         </View>
         <View style={styles.shareContainer}>
-          <Text style={styles.label}>Compartir:</Text>
+          <Text style={styles.label}>Archivar:</Text>
           <Switch
             value={share}
             onValueChange={setShare}
@@ -315,17 +450,51 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
         </TouchableOpacity>
       </View>
 
+      <Modal
+        visible={isActionSheetVisible}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setIsActionSheetVisible(false)}
+      >
+        <View style={styles.actionSheetContainer}>
+          <View style={styles.actionSheet}>
+            <TouchableOpacity
+              style={styles.closeButton}
+              onPress={() => setIsActionSheetVisible(false)}
+            >
+              <FontAwesomeIcon icon={faTimesCircle} size={24} color="#999" />
+            </TouchableOpacity>
+
+            <View style={styles.optionsContainer}>
+              <TouchableOpacity onPress={() => handleActionSheetPress('camera')}>
+                <FontAwesomeIcon icon={faCamera} size={40} color="#185abd" />
+                <Text style={styles.optionText}>Cámara</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleActionSheetPress('gallery')}>
+                <FontAwesomeIcon icon={faImages} size={40} color="#185abd" />
+                <Text style={styles.optionText}>Galería</Text>
+              </TouchableOpacity>
+              <TouchableOpacity onPress={() => handleActionSheetPress('files')}>
+                <FontAwesomeIcon icon={faFile} size={40} color="#185abd" />
+                <Text style={styles.optionText}>Archivos</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    
       <Modal visible={isImageViewerVisible} transparent={true} animationType="slide">
         <ImageViewer
           visible={isImageViewerVisible}
           images={[
             principalDocument && { uri: principalDocument.uri },
             secondaryDocument && { uri: secondaryDocument?.uri }
-          ].filter(Boolean)}
+          ].filter(Boolean)} 
           initialIndex={currentImageUri}
-          onClose={() => setIsImageViewerVisible(false)}
+          onClose={() => setIsImageViewerVisible(false)} 
         />
       </Modal>
+
     </ScrollView>
   );
 };
@@ -456,6 +625,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   shareContainer: {
+    paddingTop: 25,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -489,6 +659,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  actionSheetContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  actionSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  closeButton: {
+    alignSelf: 'flex-end',
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 20,
+  },
+  optionText: {
+    textAlign: 'center',
+    marginTop: 8,
+    fontSize: 16,
+    color: '#333',
   },
 });
 

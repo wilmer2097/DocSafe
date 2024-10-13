@@ -9,16 +9,22 @@ buildscript {
     }
     repositories {
         google()
-        mavenCentral()
-        jcenter()
+        mavenCentral() // Usar mavenCentral() en lugar de jcenter()
         maven { url 'https://jitpack.io' }
     }
     dependencies {
         classpath("com.android.tools.build:gradle:8.1.1") // Actualiza la versión si es necesario
-        classpath("com.facebook.react:react-native-gradle-plugin:0.71.9") // Actualiza la versión si es necesario
+        classpath("com.facebook.react:react-native-gradle-plugin:0.74.5") // Actualiza la versión si es necesario
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.22")
     }
 }
 
+allprojects {
+    repositories {
+        google()
+        mavenCentral() // Asegúrate de que esté aquí también
+        maven { url 'https://jitpack.io' }
+    }
+}
 
 apply plugin: "com.facebook.react.rootproject"

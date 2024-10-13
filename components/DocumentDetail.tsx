@@ -3,8 +3,10 @@ import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Ima
 import DateTimePicker from '@react-native-community/datetimepicker';
 import RNFS from 'react-native-fs';
 import DocumentPicker from 'react-native-document-picker';
+import { launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+
 import { 
   faTrashAlt, 
   faArrowLeft, 
@@ -21,42 +23,50 @@ import {
   faFileAudio, 
   faFileCirclePlus,
   faCalendarAlt,
-  faSave
+  faSave,
+  faShareAlt,
+  faTimesCircle,
+  faCamera,
+  faImages,
+  faFile
 } from '@fortawesome/free-solid-svg-icons';
 import ImageViewer from './ImageViewer';
 import { openDocument } from './utils';
+import Share from 'react-native-share';
 
 const DocumentDetail = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { document, onGoBack } = route.params;
-
+  const [fileType, setFileType] = useState(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [url, setUrl] = useState('');
   const [expiryDate, setExpiryDate] = useState(new Date());
   const [share, setShare] = useState(false);
+  const [creationDate, setCreationDate] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [documentFiles, setDocumentFiles] = useState([]);
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [currentImageUri, setCurrentImageUri] = useState(0);
-
+  const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
   useEffect(() => {
     const loadDocumentData = async () => {
       const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
-
+  
       if (await RNFS.exists(filesJsonPath)) {
         const jsonData = await RNFS.readFile(filesJsonPath);
         const filesData = JSON.parse(jsonData).archivos;
         const fileData = filesData.find(file => file.id_archivo === document.id_archivo);
-
+  
         if (fileData) {
           setName(fileData.nombre);
           setDescription(fileData.descripcion);
           setUrl(fileData.url);
           setExpiryDate(new Date(fileData.expiryDate));
+          setCreationDate(new Date(fileData.fecha_creacion).toLocaleDateString());
           setShare(fileData.share);
-
+  
           const filesToShow = fileData.imagenes.map(fileName => `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`);
           setDocumentFiles(filesToShow);
         } else {
@@ -64,24 +74,98 @@ const DocumentDetail = () => {
         }
       }
     };
-
+  
+    
+  
     loadDocumentData();
   }, [document.id_archivo]);
+  
+  const abrirCamara = async () => {
+    try {
+      const image = await launchCamera({ mediaType: 'photo', saveToPhotos: true });
+      if (image.assets && image.assets.length > 0) {
+        const fileName = `camera_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+        const filePath = image.assets[0].uri;
+        const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
+        await RNFS.copyFile(filePath, destinationPath);
+
+        handleFileSelection(destinationPath);
+      }
+    } catch (error) {
+      console.error('Error capturando la imagen con la cámara:', error);
+    }
+  };
+
+  const abrirGaleria = async () => {
+    try {
+      const image = await launchImageLibrary({ mediaType: 'photo' });
+      if (image.assets && image.assets.length > 0) {
+        const fileName = image.assets[0].fileName || `gallery_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+        const filePath = image.assets[0].uri;
+        const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
+        await RNFS.copyFile(filePath, destinationPath);
+
+        handleFileSelection(destinationPath);
+      }
+    } catch (error) {
+      console.error('Error seleccionando la imagen de la galería:', error);
+    }
+  };
+
+  const abrirDocumentos = async () => {
+    try {
+      const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
+      if (result && result[0]) {
+        const fileName = result[0].name;
+        const filePath = result[0].uri;
+        const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
+        await RNFS.copyFile(filePath, destinationPath);
+
+        handleFileSelection(destinationPath);
+      }
+    } catch (error) {
+      if (!DocumentPicker.isCancel(error)) {
+        console.error('Error al seleccionar el archivo:', error);
+      }
+    }
+  };
+
+  const handleFileSelection = (newFilePath) => {
+    const updatedFiles = [...documentFiles];
+    if (fileType === 'principal') {
+      updatedFiles[0] = newFilePath;
+    } else {
+      updatedFiles.push(newFilePath);
+    }
+    setDocumentFiles(updatedFiles);
+    setIsActionSheetVisible(false);
+  };
+  const handleActionSheetPress = (option) => {
+    if (option === 'camera') abrirCamara();
+    if (option === 'gallery') abrirGaleria();
+    if (option === 'files') abrirDocumentos();
+    setIsActionSheetVisible(false); // Cierra el action sheet después de la selección
+  };
 
   const saveDocumentData = async () => {
     if (!documentFiles[0]) {
       Alert.alert('Error', 'Debe existir un archivo principal para guardar los cambios.');
       return;
     }
-
+  
+    if (url && !validateURL(url)) {
+      Alert.alert('Error', 'La URL del documento no es válida. Asegúrate de que sea una URL válida con un dominio o subdominio.');
+      return;
+    }
+  
     try {
       const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
-
+  
       if (await RNFS.exists(filesJsonPath)) {
         const jsonData = await RNFS.readFile(filesJsonPath);
         let filesData = JSON.parse(jsonData);
         const fileIndex = filesData.archivos.findIndex(file => file.id_archivo === document.id_archivo);
-
+  
         if (fileIndex !== -1) {
           filesData.archivos[fileIndex] = {
             ...filesData.archivos[fileIndex],
@@ -92,7 +176,7 @@ const DocumentDetail = () => {
             share: share,
             imagenes: documentFiles.map(file => file ? file.split('/').pop() : null)
           };
-
+  
           await RNFS.writeFile(filesJsonPath, JSON.stringify(filesData));
           Alert.alert('Éxito', 'Datos del documento guardados correctamente.');
           onGoBack?.();
@@ -104,6 +188,33 @@ const DocumentDetail = () => {
     } catch (error) {
       console.error('Error al guardar los datos del documento:', error);
       Alert.alert('Error', 'No se pudieron guardar los datos del documento.');
+    }
+  };
+
+  const handleCaptureImage = async () => {
+    const options = {
+      mediaType: 'photo',
+      saveToPhotos: true, // Opcional, para guardar en la galería del usuario
+    };
+  
+    const result = await launchCamera(options);
+  
+    if (result.assets && result.assets.length > 0) {
+      const fileName = result.assets[0].fileName || `camera_photo_${Date.now()}.jpg`; // Usar el nombre original o generar uno único
+      const filePath = result.assets[0].uri;
+      const newFilePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
+      
+      await RNFS.copyFile(filePath, newFilePath);
+  
+      const updatedFiles = [...documentFiles];
+      if (!updatedFiles[0]) {
+        updatedFiles[0] = newFilePath;
+      } else {
+        updatedFiles.push(newFilePath);
+      }
+  
+      setDocumentFiles(updatedFiles);
+      Alert.alert('Éxito', 'Foto capturada y guardada correctamente.');
     }
   };
 
@@ -137,14 +248,20 @@ const DocumentDetail = () => {
     }
   };
 
+  const validateURL = (url) => {
+    const pattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
+    return pattern.test(url);
+  };
+
   const handleFileOperation = async (operationType, file, index) => {
     try {
       const result = await DocumentPicker.pick({
-        type: [DocumentPicker.types.allFiles],
+        type: [DocumentPicker.types.images], // O el tipo que necesites
       });
   
-      if (result) {
-        const newFilePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${result[0].name}`;
+      if (result && result.length > 0) {
+        const fileName = result[0].name; // Obtener el nombre original del archivo
+        const newFilePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
         await RNFS.copyFile(result[0].uri, newFilePath);
   
         if (operationType === 'edit') {
@@ -170,6 +287,59 @@ const DocumentDetail = () => {
         console.error(`Error al ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo:`, error);
         Alert.alert('Error', `No se pudo ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo.`);
       }
+    }
+  };
+
+  const handleShare = async (file) => {
+    if (!file) {
+      Alert.alert('Error', 'No hay archivo para Archivar.');
+      return;
+    }
+  
+    try {
+      const fileUri = `file://${file}`;
+      const mimeType = getMimeType(fileUri) || '*/*';
+  
+      const shareOptions = {
+        title: 'Archivar Documento',
+        urls: [fileUri],
+        message: `Mira este documento: ${name}`,
+        type: mimeType,
+      };
+  
+      await Share.open(shareOptions);
+    } catch (error) {
+      console.error('Error al Archivar el documento:', error);
+    }
+  };
+  
+  const getMimeType = (fileUri) => {
+    const extension = fileUri.split('.').pop().toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return 'application/pdf';
+      case 'doc':
+      case 'docx':
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+      case 'xls':
+      case 'xlsx':
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+      case 'ppt':
+      case 'pptx':
+        return 'application/vnd.ms-powerpoint';
+      case 'jpg':
+      case 'jpeg':
+        return 'image/jpeg';
+      case 'png':
+        return 'image/png';
+      case 'mp3':
+      case 'wav':
+        return 'audio/*';
+      case 'mp4':
+      case 'mkv':
+        return 'video/*';
+      default:
+        return '*/*';
     }
   };
 
@@ -248,9 +418,9 @@ const DocumentDetail = () => {
     if (!file) {
       return renderAddFileIcon(index === 0 ? 'Principal/Anverso' : 'Secundario/Reverso');
     }
-
+  
     const { icon, color } = getFileType(file);
-
+  
     return (
       <View key={index} style={styles.documentSection}>
         <Text style={styles.sectionLabel}>{index === 0 ? 'Principal/Anverso' : 'Secundario/Reverso'}</Text>
@@ -268,6 +438,9 @@ const DocumentDetail = () => {
           <TouchableOpacity onPress={() => deleteFile(file, index)} style={styles.iconButton}>
             <FontAwesomeIcon icon={faTrashAlt} size={20} color="#cc0000" />
           </TouchableOpacity>
+          <TouchableOpacity onPress={() => handleShare(file)} style={styles.iconButton}>
+            <FontAwesomeIcon icon={faShareAlt} size={20} color="#185abd" />
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -276,9 +449,15 @@ const DocumentDetail = () => {
   const renderAddFileIcon = (label) => (
     <View style={styles.documentSection}>
       <Text style={styles.sectionLabel}>{label}</Text>
-      <TouchableOpacity style={styles.fileContainer} onPress={() => handleFileOperation('add')}>
-        <FontAwesomeIcon icon={faFileCirclePlus} size={50} color="#185abd" />
-      </TouchableOpacity>
+      <TouchableOpacity
+      onPress={() => {
+        setFileType(label === 'Principal/Anverso' ? 'principal' : 'secondary'); // Establece si es principal o secundario
+        setIsActionSheetVisible(true); // Muestra las opciones de selección de archivos
+      }}
+      style={styles.fileContainer}
+    >
+      <FontAwesomeIcon icon={faFileCirclePlus} size={50} color="#185abd" />
+    </TouchableOpacity>
     </View>
   );
 
@@ -332,19 +511,21 @@ const DocumentDetail = () => {
       </View>
 
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>URL del documento:</Text>
+        <Text style={styles.label}>Documento en la web:</Text>
         <View style={styles.urlContainer}>
           <TextInput
             style={[styles.input, styles.urlInput]}
             placeholder="URL (Opcional)"
             value={url}
             onChangeText={setUrl}
-            placeholderTextColor="#9a9a9a"
-          />
+            placeholderTextColor="#9a9a9a"/>
           <FontAwesomeIcon icon={faLink} size={24} color="#185abd" />
         </View>
       </View>
-
+      <View style={styles.inputContainer}>
+      <Text style={styles.label}>Fecha de creación:</Text>
+      <Text style={styles.creationDate}>{creationDate}</Text>
+    </View>
       <View style={styles.dateAndShareContainer}>
         <View style={styles.dateContainer}>
           <Text style={styles.label}>Fecha de caducidad:</Text>
@@ -362,7 +543,7 @@ const DocumentDetail = () => {
           )}
         </View>
         <View style={styles.shareContainer}>
-          <Text style={styles.label}>Compartir:</Text>
+          <Text style={styles.label}>Archivar:</Text>
           <Switch
             value={share}
             onValueChange={setShare}
@@ -386,6 +567,29 @@ const DocumentDetail = () => {
           onClose={() => setIsImageViewerVisible(false)}
         />
       </Modal>
+      <Modal visible={isActionSheetVisible} transparent={true} animationType="slide">
+      <View style={styles.modalContainer}>
+        <View style={styles.actionSheet}>
+          <TouchableOpacity onPress={() => setIsActionSheetVisible(false)} style={styles.closeButton}>
+            <FontAwesomeIcon icon={faTimesCircle} size={24} color="#999" />
+          </TouchableOpacity>
+          <View style={styles.optionsContainer}>
+          <TouchableOpacity onPress={() => handleActionSheetPress('camera')}>
+          <FontAwesomeIcon icon={faCamera} size={40} color="#185abd" />
+          <Text style={styles.optionText}>Cámara</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleActionSheetPress('gallery')}>
+          <FontAwesomeIcon icon={faImages} size={40} color="#185abd" />
+          <Text style={styles.optionText}>Galería</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleActionSheetPress('files')}>
+          <FontAwesomeIcon icon={faFile} size={40} color="#185abd" />
+          <Text style={styles.optionText}>Archivos</Text>
+        </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>    
     </ScrollView>
   );
 };
@@ -395,6 +599,18 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     backgroundColor: '#f5f5f5',
+  },
+  creationDate: {
+    fontSize: 16,
+    color: '#333',
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ffffff',
+    borderColor: '#ddd',
+    borderWidth: 1,
+    borderRadius: 8,
+    padding: 12,
   },
   headerIcon: {
     padding: 10,
@@ -518,6 +734,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   shareContainer: {
+    paddingTop: 25,
     flexDirection: 'row',
     alignItems: 'center',
   },
@@ -536,6 +753,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  actionSheet: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    padding: 20,
+    paddingBottom: 40,
+  },
+  closeButton: {
+    alignSelf: 'flex-end',
+  },
+  optionsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginTop: 20,
+  },
+  optionText: {
+    textAlign: 'center',
+    marginTop: 8,
+    fontSize: 16,
+    color: '#333',
   },
 });
 
