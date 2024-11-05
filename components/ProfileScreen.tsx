@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, Image, StyleSheet, Alert, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useEffect } from 'react'; 
+import { ScrollView, View, Text, TextInput, TouchableOpacity, Image, StyleSheet, Alert, KeyboardAvoidingView, Switch } from 'react-native';
 import RNFS from 'react-native-fs';
+import ReactNativeBiometrics from 'react-native-biometrics';
 import CustomAlert from './CustomAlert';
 
 const ProfileScreen = ({ navigation }) => {
@@ -8,16 +9,18 @@ const ProfileScreen = ({ navigation }) => {
     estado: 'Activo',
     name: '',
     profileImage: null,
-    loginCode: '',
+    loginCode: '', // Ahora editable
     ciudad: '',
     telefono: '',
     correo: '',
+    biometricsEnabled: false,
   });
 
   const [firstTime, setFirstTime] = useState(true);
   const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
   const [errorTelefono, setErrorTelefono] = useState(null);
   const [showAlert, setShowAlert] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -29,8 +32,6 @@ const ProfileScreen = ({ navigation }) => {
           setProfile(prev => ({ ...prev, ...savedProfile }));
           setFirstTime(false);
         } else {
-          const generatedLoginCode = Math.floor(1000 + Math.random() * 9000).toString();
-          setProfile(prev => ({ ...prev, loginCode: generatedLoginCode }));
           setFirstTime(true);
         }
       } catch (error) {
@@ -60,44 +61,147 @@ const ProfileScreen = ({ navigation }) => {
     return true;
   };
 
+  const validateLoginCode = (loginCode) => {
+    if (loginCode.length !== 4 || isNaN(loginCode)) {
+      Alert.alert('Error', 'El código de acceso debe tener 4 dígitos.');
+      return false;
+    }
+    return true;
+  };
+
   const handleSaveProfile = async () => {
-    if (!profile.name.trim() || profile.loginCode.length !== 4) {
-      Alert.alert('Error', 'Nombre y un código de acceso de 4 dígitos son requeridos.');
+    if (isSubmitting) {
       return;
     }
-
+  
+    setIsSubmitting(true);
+    
+    // Validaciones
+    if (!profile.name.trim()) {
+      Alert.alert('Error', 'El nombre es obligatorio.');
+      setIsSubmitting(false);
+      return;
+    }
+  
     if (!validateEmail(profile.correo)) {
       Alert.alert('Error', 'Por favor ingresa un correo electrónico válido.');
+      setIsSubmitting(false);
       return;
     }
-
+  
     if (!validateTelefono(profile.telefono)) {
       Alert.alert('Error', errorTelefono);
+      setIsSubmitting(false);
       return;
     }
-
+  
+    if (!validateLoginCode(profile.loginCode)) {
+      setIsSubmitting(false);
+      return;
+    }
+  
     try {
-      const newProfile = JSON.stringify({ perfilUsuario: profile });
-      await RNFS.writeFile(profilePath, newProfile, 'utf8');
-      setShowAlert(true);
+      if (firstTime) {
+        // Crear nuevo perfil (similar al código existente para creación)
+        const datosPerfil = {
+          a: "I",
+          nombre: profile.name,
+          correo: profile.correo,
+          telefono: profile.telefono,
+          ciudad: profile.ciudad,
+          tec_ope_pass: profile.loginCode,
+          fec_ini: new Date().toISOString().split('T')[0],
+          fec_fin: "2025-10-01",
+          fec_cre: new Date().toISOString().split('T')[0],
+          tec_prf_id: 13,
+          ope_estado_id: 1,
+        };
+  
+        const response = await fetch('https://biblioteca1.info/docsafe/api/registrar_users.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(datosPerfil),
+        });
+  
+        const result = await response.json();
+        if (response.ok && result.success === true) {
+          const clienteId = result.cliente_id;
+          await setProfile(prev => ({ ...prev, clienteId }));
+  
+          const newProfile = JSON.stringify({ perfilUsuario: { ...profile, clienteId } });
+          await RNFS.writeFile(profilePath, newProfile, 'utf8');
+          setShowAlert(true);
+        } else {
+          Alert.alert('Error', 'Hubo un problema al registrar el usuario.');
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        // Actualizar perfil existente
+        const datosPerfilActualizados = {
+          a: "U",
+          cliente_id: profile.clienteId,
+          nombre: profile.name,
+          correo: profile.correo,
+          telefono: profile.telefono,
+          ciudad: profile.ciudad,
+          tec_ope_pass: profile.loginCode,  // Código de acceso actualizado
+          fec_mod: new Date().toISOString().split('T')[0],
+          fec_ini: "2024-10-27",  // Fecha de inicio
+          fec_fin: "2024-11-27",  // Fecha de fin
+          ope_estado_id: 1,
+        };
+  
+        const response = await fetch('https://biblioteca1.info/docsafe/api/registrar_users.php', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(datosPerfilActualizados),
+        });
+  
+        const result = await response.json();
+        if (response.ok && result.success === true) {
+          const updatedProfile = JSON.stringify({ perfilUsuario: profile });
+          await RNFS.writeFile(profilePath, updatedProfile, 'utf8');
+          setShowAlert(true);
+        } else {
+          Alert.alert('Error', 'Hubo un problema al actualizar el perfil.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
     } catch (error) {
-      console.error('Error al guardar el perfil:', error);
-      Alert.alert('Error', 'No se pudo guardar el perfil: ' + error.message);
+      Alert.alert('Error', 'Hubo un problema al procesar el registro: ' + error.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
+  
 
   const handleChange = (key, value) => {
     if (key === 'correo') {
       value = value.toLowerCase();
     }
-  
+
     if (key === 'telefono') {
-      // Limpiar el número de teléfono para asegurar que solo queden 9 dígitos
-      // Eliminar caracteres no numéricos y mantener solo los últimos 9 dígitos
       const cleanedValue = value.replace(/\D+/g, '').slice(-9);
       setProfile(prev => ({ ...prev, [key]: cleanedValue }));
     } else {
       setProfile(prev => ({ ...prev, [key]: value }));
+    }
+  };
+
+  const toggleBiometrics = async (enabled) => {
+    const rnBiometrics = new ReactNativeBiometrics();
+    const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+
+    if (available && (biometryType === ReactNativeBiometrics.TouchID || biometryType === ReactNativeBiometrics.Biometrics)) {
+      setProfile(prev => ({ ...prev, biometricsEnabled: enabled }));
+    } else {
+      Alert.alert('Error', 'Autenticación biométrica no disponible en este dispositivo.');
     }
   };
 
@@ -151,6 +255,26 @@ const ProfileScreen = ({ navigation }) => {
           {errorTelefono && <Text style={styles.error}>{errorTelefono}</Text>}
         </View>
 
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Código de acceso</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Código de acceso"
+            value={profile.loginCode}
+            onChangeText={(text) => handleChange('loginCode', text)}
+            keyboardType="numeric"
+            maxLength={4}
+          />
+        </View>
+
+        <View style={styles.inputContainer}>
+          <Text style={styles.label}>Habilitar autenticación biométrica</Text>
+          <Switch
+            value={profile.biometricsEnabled}
+            onValueChange={(value) => toggleBiometrics(value)}
+          />
+        </View>
+
         {!firstTime && (
           <>
             <View style={styles.inputContainer}>
@@ -167,15 +291,6 @@ const ProfileScreen = ({ navigation }) => {
               <TextInput
                 style={styles.input}
                 value={profile.estado}
-                editable={false}
-              />
-            </View>
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>Código de acceso</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Código de acceso"
-                value={profile.loginCode}
                 editable={false}
               />
             </View>

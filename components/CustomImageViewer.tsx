@@ -200,37 +200,38 @@ const CustomImageViewer = ({ visible, images, initialIndex = 0, onClose, documen
 
   return (
     <Modal
-      visible={visible}
-      transparent={true}
-      animationType="none"
-      onRequestClose={handleClose}
-    >
-      <Animated.View style={[styles.modalContainer, { opacity: fadeAnim }]}>
-        <FlatList
-          ref={flatListRef}
-          data={images}
-          renderItem={renderImage}
-          keyExtractor={(item, index) => `${item.uri}-${index}`}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          initialScrollIndex={currentIndex}
-          onViewableItemsChanged={onViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
-          getItemLayout={(data, index) => (
-            { length: width, offset: width * index, index }
-          )}
-          style={styles.flatList}
-          scrollEnabled={scrollEnabled} // Controla el scroll con base en el zoom
-        />
-        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-          <FontAwesomeIcon icon={faTimes} size={24} color="#ffffff" />
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-          <FontAwesomeIcon icon={faShareAlt} size={24} color="#ffffff" />
-        </TouchableOpacity>
-      </Animated.View>
-    </Modal>
+    visible={visible}
+    transparent={true}
+    animationType="none"
+    onRequestClose={handleClose}
+  >
+    <Animated.View style={[styles.modalContainer, { opacity: fadeAnim }]}>
+      <FlatList
+        ref={flatListRef}
+        data={images}
+        renderItem={renderImage}
+        keyExtractor={(item, index) => `${item.uri}-${index}`}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        initialScrollIndex={currentIndex}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+        getItemLayout={(data, index) => (
+          { length: width, offset: width * index, index }
+        )}
+        style={styles.flatList}
+        scrollEnabled={scrollEnabled}  // Desactivar scroll cuando el zoom está activo
+      />
+      <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+        <FontAwesomeIcon icon={faTimes} size={24} color="#ffffff" />
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
+        <FontAwesomeIcon icon={faShareAlt} size={24} color="#ffffff" />
+      </TouchableOpacity>
+    </Animated.View>
+  </Modal>
+  
   );
 };
 

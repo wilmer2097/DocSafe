@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, FlatList, TouchableOpacity, Image, Modal, Alert } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, Image, Modal } from 'react-native';
 import RNFS from 'react-native-fs';
 import DocumentItem from './DocumentItem';
 import AddDocumentForm from './AddDocumentForm';
@@ -7,6 +7,7 @@ import { styles } from '../styles/styles';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faFileCirclePlus, faEye } from '@fortawesome/free-solid-svg-icons';
+import CustomAlert from './CustomAlert';  // Importar la alerta personalizada
 
 const HomeScreen = () => {
   const [documents, setDocuments] = useState([]);
@@ -16,6 +17,9 @@ const HomeScreen = () => {
     profileImage: require('../src/presentation/assets/foto.jpg'), // Imagen por defecto
     loginCode: '0000',
   });
+  const [showAlert, setShowAlert] = useState(false);  // Estado para la alerta personalizada
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });  // Configuración de la alerta
+
   const folderPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
   const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
   const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
@@ -36,7 +40,7 @@ const HomeScreen = () => {
       }
     } catch (error) {
       console.error("Error loading profile:", error);
-      Alert.alert("Error", "No se pudo cargar el perfil.");
+      showCustomAlert('Error', 'No se pudo cargar el perfil.');
     }
   };
 
@@ -65,8 +69,13 @@ const HomeScreen = () => {
       }
     } catch (error) {
       console.error("Error loading documents:", error);
-      Alert.alert("Error", "No se pudieron cargar los documentos.");
+      showCustomAlert('Error', 'No se pudieron cargar los documentos.');
     }
+  };
+
+  const showCustomAlert = (title, message) => {
+    setAlertConfig({ title, message });
+    setShowAlert(true);
   };
 
   useFocusEffect(
@@ -89,7 +98,7 @@ const HomeScreen = () => {
     try {
       const fileExists = await RNFS.exists(filePath);
       if (!fileExists) {
-        Alert.alert("Error", "El archivo no existe.");
+        showCustomAlert('Error', 'El archivo no existe.');
         return;
       }
 
@@ -99,9 +108,10 @@ const HomeScreen = () => {
         await RNFS.unlink(jsonFilePath);
       }
       loadDocuments();
+      showCustomAlert('Éxito', 'Documento eliminado con éxito.');
     } catch (error) {
       console.error("Error deleting document:", error);
-      Alert.alert("Error", "No se pudo eliminar el documento.");
+      showCustomAlert('Error', 'No se pudo eliminar el documento.');
     }
   };
 
@@ -115,14 +125,15 @@ const HomeScreen = () => {
         await RNFS.moveFile(jsonFilePath, newJsonFilePath);
       }
       loadDocuments();
+      showCustomAlert('Éxito', 'Documento renombrado con éxito.');
     } catch (error) {
       console.error("Error renaming document:", error);
-      Alert.alert("Error", "No se pudo renombrar el documento.");
+      showCustomAlert('Error', 'No se pudo renombrar el documento.');
     }
   };
 
   const shareDocument = () => {
-    Alert.alert("Compartir", "Funcionalidad de compartir no implementada.");
+    showCustomAlert('Información', 'Funcionalidad de compartir no implementada.');
   };
 
   const handleProfileSave = (updatedProfile) => {
@@ -171,6 +182,16 @@ const HomeScreen = () => {
           onDocumentAdded={handleDocumentAdded}
         />
       </Modal>
+      {/* Mostrar alerta personalizada */}
+      {showAlert && (
+        <CustomAlert
+          visible={showAlert}
+          onClose={() => setShowAlert(false)}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          onAccept={() => setShowAlert(false)}
+        />
+      )}
     </View>
   );
 };

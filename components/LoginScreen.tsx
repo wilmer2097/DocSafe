@@ -1,9 +1,11 @@
 import React, { useState, useCallback } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image, SafeAreaView, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Image, SafeAreaView, Dimensions, Alert } from 'react-native';
 import RNFS from 'react-native-fs';
 import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faKey, faBackspace } from '@fortawesome/free-solid-svg-icons';
+import { faKey, faBackspace, faFingerprint } from '@fortawesome/free-solid-svg-icons';
+import CustomAlert from './CustomAlert';  // Importamos CustomAlert
+import LocalAuthentication from 'react-native-local-authentication';
 
 const { width } = Dimensions.get('window');
 
@@ -11,6 +13,9 @@ const LoginScreen = ({ navigation }) => {
   const [code, setCode] = useState('');
   const [loading, setLoading] = useState(false);
   const [savedCode, setSavedCode] = useState('');
+  const [biometricsEnabled, setBiometricsEnabled] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);  // Estado para la alerta personalizada
+  const [alertData, setAlertData] = useState({ title: '', message: '', token: '' });  // Datos para la alerta
 
   useFocusEffect(
     useCallback(() => {
@@ -25,15 +30,16 @@ const LoginScreen = ({ navigation }) => {
 
             if (perfilUsuario && perfilUsuario.loginCode) {
               setSavedCode(perfilUsuario.loginCode);
+              setBiometricsEnabled(perfilUsuario.biometricsEnabled || false);
             } else {
-              Alert.alert('Error', 'No se pudo cargar el código de acceso. Asegúrese de que el perfil esté configurado correctamente.');
+              showCustomAlert('Error', 'No se pudo cargar el código de acceso.');
             }
           } else {
-            Alert.alert('Error', 'Perfil no encontrado. Por favor, configure el perfil.');
+            showCustomAlert('Error', 'Perfil no encontrado. Por favor, configure el perfil.');
           }
         } catch (error) {
           console.error('Error cargando el perfil:', error);
-          Alert.alert('Error', 'Ocurrió un error al cargar el perfil.');
+          showCustomAlert('Error', 'Ocurrió un error al cargar el perfil.');
         }
       };
 
@@ -41,37 +47,88 @@ const LoginScreen = ({ navigation }) => {
     }, [navigation])
   );
 
-  const handleLogin = () => {
+  const showCustomAlert = (title, message, token = '') => {
+    setAlertData({ title, message, token });
+    setAlertVisible(true);
+  };
+
+  const handlePress = (num) => {
+    if (code.length < 4) {
+      setCode(code + num);  // Concatenar el número al código actual
+    }
+  };
+
+  const handleDelete = () => {
+    setCode(code.slice(0, -1));  // Eliminar el último dígito
+  };
+
+  const handleLogin = async () => {
     if (code.length !== 4) {
-      Alert.alert('Error', 'Debe ingresar un código de 4 dígitos.');
+      showCustomAlert('Error', 'Debe ingresar un código de 4 dígitos.');
       return;
     }
 
     setLoading(true);
 
     try {
-      if (code === savedCode || code === '0000') {
-        setCode('');
+      const loginData = {
+        a: "login_auth",
+        tec_ope_pass: code,  // Token ingresado por el usuario
+      };
+
+      console.log('Datos enviados a la API para login:', loginData);
+
+      const response = await fetch('https://biblioteca1.info/docsafe/api/registrar_users.php', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(loginData),
+      });
+
+      const result = await response.json();
+      console.log('Respuesta de la API de login:', result);
+
+      if (response.ok && result.success === true) {
+        setCode('');  // Limpiar el código ingresado
         navigation.navigate('Home');
       } else {
-        Alert.alert('Error', 'Código incorrecto. Inténtalo de nuevo.');
+        showCustomAlert('Error', 'Código incorrecto. Inténtalo de nuevo.');
       }
     } catch (error) {
       console.error('Error durante el inicio de sesión:', error);
-      Alert.alert('Error', 'No se pudo verificar el código. Inténtalo de nuevo.');
+      showCustomAlert('Error', 'No se pudo verificar el código. Inténtalo de nuevo.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handlePress = (num) => {
-    if (code.length < 4) {
-      setCode(code + num);
+  const handleBiometricLogin = async () => {
+    if (!biometricsEnabled) {
+      showCustomAlert('Error', 'La autenticación biométrica no está habilitada.');
+      return;
     }
-  };
 
-  const handleDelete = () => {
-    setCode(code.slice(0, -1));
+    try {
+      const isSupported = await LocalAuthentication.isSupported();
+
+      if (isSupported) {
+        const result = await LocalAuthentication.authenticate({
+          reason: 'Verifica tu identidad con la huella digital'
+        });
+
+        if (result.success) {
+          navigation.navigate('Home');
+        } else {
+          showCustomAlert('Error', 'La autenticación biométrica falló. Inténtalo de nuevo.');
+        }
+      } else {
+        showCustomAlert('Error', 'Autenticación biométrica no disponible en este dispositivo.');
+      }
+    } catch (error) {
+      console.error('Error durante la autenticación biométrica:', error);
+      showCustomAlert('Error', 'No se pudo completar la autenticación biométrica. Inténtalo de nuevo.');
+    }
   };
 
   return (
@@ -123,7 +180,23 @@ const LoginScreen = ({ navigation }) => {
           <FontAwesomeIcon icon={faKey} size={20} color="#155abd" />
           <Text style={styles.forgotPasswordText}>Recuperar Token ID</Text>
         </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.biometricButton}
+          onPress={handleBiometricLogin}
+        >
+          <FontAwesomeIcon icon={faFingerprint} size={24} color="#fff" />
+          <Text style={styles.biometricButtonText}>Iniciar sesión con huella digital</Text>
+        </TouchableOpacity>
       </View>
+      {/* Componente de CustomAlert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertData.title}
+        message={alertData.message}
+        token={alertData.token}
+        onClose={() => setAlertVisible(false)}
+        onAccept={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -213,6 +286,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 10,
+  },
+  biometricButton: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#155abd',
+    padding: 10,
+    borderRadius: 10,
+  },
+  biometricButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    marginLeft: 10,
+    fontWeight: '600',
   },
 });
 

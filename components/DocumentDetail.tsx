@@ -6,6 +6,9 @@ import DocumentPicker from 'react-native-document-picker';
 import { launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
+import CustomImageViewer from './CustomImageViewer';
+import CustomAlert from './CustomAlert'; // Importación de CustomAlert
+
 
 import { 
   faTrashAlt, 
@@ -30,7 +33,6 @@ import {
   faImages,
   faFile
 } from '@fortawesome/free-solid-svg-icons';
-import ImageViewer from './ImageViewer';
 import { openDocument } from './utils';
 import Share from 'react-native-share';
 
@@ -70,12 +72,11 @@ const DocumentDetail = () => {
           const filesToShow = fileData.imagenes.map(fileName => `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`);
           setDocumentFiles(filesToShow);
         } else {
-          Alert.alert('Error', 'No se encontraron los datos del documento.');
+          showCustomAlert('Error', 'No se encontraron los datos del documento.');
         }
       }
     };
-  
-    
+   
   
     loadDocumentData();
   }, [document.id_archivo]);
@@ -148,13 +149,18 @@ const DocumentDetail = () => {
   };
 
   const saveDocumentData = async () => {
+    if (!name.trim()) {
+      showCustomAlert('Error', 'El nombre del documento es obligatorio.');
+      return;
+    }
+  
     if (!documentFiles[0]) {
-      Alert.alert('Error', 'Debe existir un archivo principal para guardar los cambios.');
+      showCustomAlert('Error', 'Debe existir un archivo principal para guardar los cambios.');
       return;
     }
   
     if (url && !validateURL(url)) {
-      Alert.alert('Error', 'La URL del documento no es válida. Asegúrate de que sea una URL válida con un dominio o subdominio.');
+      showCustomAlert('Error', 'La URL del documento no es válida. Asegúrate de que sea una URL válida con un dominio o subdominio.');
       return;
     }
   
@@ -178,18 +184,17 @@ const DocumentDetail = () => {
           };
   
           await RNFS.writeFile(filesJsonPath, JSON.stringify(filesData));
-          Alert.alert('Éxito', 'Datos del documento guardados correctamente.');
-          onGoBack?.();
-          navigation.goBack();
+          showCustomAlert('Éxito', 'Datos del documento guardados correctamente.', true);
         } else {
-          Alert.alert('Error', 'No se encontraron los datos del documento.');
+          showCustomAlert('Error', 'No se encontraron los datos del documento.');
         }
       }
     } catch (error) {
       console.error('Error al guardar los datos del documento:', error);
-      Alert.alert('Error', 'No se pudieron guardar los datos del documento.');
+      showCustomAlert('Error', 'No se pudieron guardar los datos del documento.');
     }
   };
+  
 
   const handleCaptureImage = async () => {
     const options = {
@@ -214,8 +219,18 @@ const DocumentDetail = () => {
       }
   
       setDocumentFiles(updatedFiles);
-      Alert.alert('Éxito', 'Foto capturada y guardada correctamente.');
+      showCustomAlert('Éxito', 'Foto capturada y guardada correctamente.');
     }
+  };
+  // Estado para la alerta personalizada
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
+  const [navigateOnAccept, setNavigateOnAccept] = useState(false);
+
+  const showCustomAlert = (title, message, shouldNavigate = false) => {
+    setAlertConfig({ title, message });
+    setShowAlert(true);
+    setNavigateOnAccept(shouldNavigate);
   };
 
   const deleteDocument = async () => {
@@ -235,16 +250,16 @@ const DocumentDetail = () => {
             if (file) await RNFS.unlink(file);
           }
 
-          Alert.alert('Éxito', 'Documento eliminado correctamente.');
+          showCustomAlert('Éxito', 'Documento eliminado correctamente.', true);
           onGoBack?.();
           navigation.goBack();
         } else {
-          Alert.alert('Error', 'No se encontraron los datos del documento.');
+          showCustomAlert('Error', 'No se encontraron los datos del documento.');
         }
       }
     } catch (error) {
       console.error('Error al eliminar el documento:', error);
-      Alert.alert('Error', 'No se pudo eliminar el documento.');
+      showCustomAlert('Error', 'No se pudo eliminar el documento.');
     }
   };
 
@@ -268,7 +283,7 @@ const DocumentDetail = () => {
           const updatedFiles = [...documentFiles];
           updatedFiles[index] = newFilePath;
           setDocumentFiles(updatedFiles);
-          Alert.alert('Éxito', 'Archivo actualizado correctamente.');
+          showCustomAlert('Éxito', 'Archivo actualizado correctamente.');
         } else if (operationType === 'add') {
           const updatedFiles = [...documentFiles];
   
@@ -279,20 +294,20 @@ const DocumentDetail = () => {
           }
   
           setDocumentFiles(updatedFiles);
-          Alert.alert('Éxito', 'Archivo agregado correctamente.');
+          showCustomAlert('Éxito', 'Archivo agregado correctamente.');
         }
       }
     } catch (error) {
       if (!DocumentPicker.isCancel(error)) {
         console.error(`Error al ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo:`, error);
-        Alert.alert('Error', `No se pudo ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo.`);
+        showCustomAlert('Error', `No se pudo ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo.`);
       }
     }
   };
 
   const handleShare = async (file) => {
     if (!file) {
-      Alert.alert('Error', 'No hay archivo para Archivar.');
+      showCustomAlert('Error', 'No hay archivo para Archivar.');
       return;
     }
   
@@ -373,10 +388,10 @@ const DocumentDetail = () => {
         setDocumentFiles(updatedFiles);
       }
 
-      Alert.alert('Éxito', 'Archivo eliminado correctamente.');
+      showCustomAlert('Éxito', 'Archivo eliminado correctamente.', true);
     } catch (error) {
       console.error('Error al eliminar el archivo:', error);
-      Alert.alert('Error', 'No se pudo eliminar el archivo.');
+      showCustomAlert('Error', 'No se pudo eliminar el archivo.');
     }
   };
 
@@ -557,16 +572,17 @@ const DocumentDetail = () => {
         <FontAwesomeIcon icon={faSave} size={24} color="#fff" />
         <Text style={styles.saveButtonText}>Guardar</Text>
       </TouchableOpacity>
-
       <Modal visible={isImageViewerVisible} transparent={true} animationType="slide">
-        <ImageViewer
-          visible={isImageViewerVisible}
-          documentName={name}
-          images={documentFiles.map(file => ({ uri: `file://${file}` }))}
-          initialIndex={currentImageUri}
-          onClose={() => setIsImageViewerVisible(false)}
-        />
-      </Modal>
+      <CustomImageViewer
+      visible={isImageViewerVisible}
+      images={documentFiles.filter(Boolean).map(file => ({ uri: `file://${file}` }))}
+      initialIndex={currentImageUri}
+      onClose={() => setIsImageViewerVisible(false)}
+      documentName={name}
+    />
+    
+    </Modal>
+    
       <Modal visible={isActionSheetVisible} transparent={true} animationType="slide">
       <View style={styles.modalContainer}>
         <View style={styles.actionSheet}>
@@ -590,6 +606,26 @@ const DocumentDetail = () => {
         </View>
       </View>
     </Modal>    
+    {/* Alerta personalizada */}
+    {showAlert && (
+      <CustomAlert
+      visible={showAlert}
+      onClose={() => {
+        setShowAlert(false);
+        if (navigateOnAccept) {
+          navigation.navigate('Documentos');  // Navega a HomeScreen al aceptar
+        }
+      }}
+      title={alertConfig.title}
+      message={alertConfig.message}
+      onAccept={() => {
+        setShowAlert(false);
+        if (navigateOnAccept) {
+          navigation.navigate('Documentos');  // Navega a HomeScreen al aceptar
+        }
+      }}
+    />
+    )}
     </ScrollView>
   );
 };

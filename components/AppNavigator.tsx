@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
+import CreateBackupScreen from './CreateBackupScreen';
+import RestoreBackupScreen from './RestoreBackupScreen';
 import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Linking } from 'react-native';
 import RNFS from 'react-native-fs';
 import HomeScreen from './HomeScreen';
@@ -12,7 +14,7 @@ import ProfileScreen from './ProfileScreen';
 import DocumentDetail from './DocumentDetail';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faFolder, faCog, faInfoCircle, faSignOutAlt, faTrashAlt, faArrowLeft, faHome, faUser, faQuestionCircle } from '@fortawesome/free-solid-svg-icons';
+import { faFolder, faCog, faInfoCircle, faSignOutAlt, faTrashAlt, faArrowLeft, faHome, faUser, faQuestionCircle, faFileExport, faFileImport } from '@fortawesome/free-solid-svg-icons';
 
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
@@ -75,6 +77,18 @@ const CustomDrawerContent = (props) => {
         <View style={styles.iconAndText}>
           <FontAwesomeIcon icon={faQuestionCircle} size={20} color="#185abd" style={styles.menuIcon} />
           <Text style={styles.menuText}>Ayuda</Text>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Crear Backup')}>
+      <View style={styles.iconAndText}>
+        <FontAwesomeIcon icon={faFileExport} size={20} color="#185abd" style={styles.menuIcon} />
+        <Text style={styles.menuText}>Crear Backup</Text>
+      </View>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Restaurar Backup')}>
+        <View style={styles.iconAndText}>
+          <FontAwesomeIcon icon={faFileImport} size={20} color="#185abd" style={styles.menuIcon} />
+          <Text style={styles.menuText}>Restaurar Backup</Text>
         </View>
       </TouchableOpacity>
   
@@ -177,6 +191,24 @@ const DrawerNavigator = () => {
         options={{
           drawerIcon: ({ color, size }) => (
             <FontAwesomeIcon icon={faFolder} color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen 
+        name="Crear Backup" 
+        component={CreateBackupScreen}
+        options={{
+          drawerIcon: ({ color, size }) => (
+            <FontAwesomeIcon icon={faFileExport} color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen 
+        name="Restaurar Backup" 
+        component={RestoreBackupScreen}
+        options={{
+          drawerIcon: ({ color, size }) => (
+            <FontAwesomeIcon icon={faFileImport} color={color} size={size} />
           ),
         }}
       />

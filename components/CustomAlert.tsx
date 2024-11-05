@@ -12,10 +12,17 @@ const CustomAlert = ({ visible, onClose, title, message, token, onAccept }) => {
         <View style={styles.modalContainer}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.message}>{message}</Text>
-          <Text style={styles.tokenLabel}>Acceder con Token ID:</Text>
-          <View style={styles.tokenContainer}>
-            <Text style={styles.tokenHighlight}>{token}</Text>
-          </View>
+
+          {/* Mostrar la sección de Token solo si existe un token */}
+          {token ? (
+            <>
+              <Text style={styles.tokenLabel}>Acceder con Token ID:</Text>
+              <View style={styles.tokenContainer}>
+                <Text style={styles.tokenHighlight}>{token}</Text>
+              </View>
+            </>
+          ) : null}
+
           <Pressable style={styles.button} onPress={() => { onAccept(); onClose(); }}>
             <Text style={styles.buttonText}>Aceptar</Text>
           </Pressable>

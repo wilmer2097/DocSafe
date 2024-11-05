@@ -1,12 +1,13 @@
 import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Linking, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { 
   faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileImage, 
   faFileAlt, faFileArchive, faFileVideo, faFileAudio, faEye, faLink, faShareAlt 
 } from '@fortawesome/free-solid-svg-icons';
-import CustomImageViewer from './CustomImageViewer'; // Cambiado a CustomImageViewer
+import CustomImageViewer from './CustomImageViewer'; 
+import CustomAlert from './CustomAlert'; 
 import { openDocument } from './utils';
 import Share from 'react-native-share'; 
 import RNFS from 'react-native-fs';
@@ -19,6 +20,15 @@ const DocumentItem = ({ documentName }) => {
   const [fileType, setFileType] = useState(null);
   const [initialIndex, setInitialIndex] = useState(0);
   const [isExpired, setIsExpired] = useState(false);
+
+  // Estado para manejar la alerta personalizada
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
+
+  const showCustomAlert = (title, message) => {
+    setAlertConfig({ title, message });
+    setShowAlert(true);
+  };
 
   const getFileType = (fileName) => {
     if (!fileName) return { icon: faFileAlt, color: '#6c757d' };
@@ -114,7 +124,6 @@ const DocumentItem = ({ documentName }) => {
               const fileExists = await RNFS.exists(filePath);
   
               if (fileExists) {
-                // Si el archivo existe, lo agregamos a la lista de imágenes
                 imageUris.push({ uri: `file://${filePath}` });
               } else {
                 console.warn(`La imagen ${file} no existe en la ruta: ${filePath}`);
@@ -122,7 +131,7 @@ const DocumentItem = ({ documentName }) => {
             }
   
             if (imageUris.length > 0) {
-              setImages(imageUris); // Usar el formato correcto para `Image` y `react-native-image-zoom-viewer`
+              setImages(imageUris);
             } else {
               console.warn('No se encontraron imágenes válidas para mostrar.');
             }
@@ -136,7 +145,7 @@ const DocumentItem = ({ documentName }) => {
       }
     } catch (error) {
       console.error('Error loading document data:', error);
-      Alert.alert('Error', 'No se pudo cargar los datos del documento.');
+      showCustomAlert('Error', 'No se pudo cargar los datos del documento.');
     }
   };
   
@@ -157,7 +166,7 @@ const DocumentItem = ({ documentName }) => {
       try {
         await openDocument(images[index]?.uri, fileType?.mimeType);
       } catch (error) {
-        Alert.alert('Error', 'No se pudo abrir el documento.');
+        showCustomAlert('Error', 'No se pudo abrir el documento.');
       }
     }
   };
@@ -166,7 +175,7 @@ const DocumentItem = ({ documentName }) => {
     if (documentData) {
       navigation.navigate('DocumentDetail', { document: documentData });
     } else {
-      Alert.alert('Error', 'No se pudieron cargar los detalles del documento.');
+      showCustomAlert('Error', 'No se pudieron cargar los detalles del documento.');
     }
   };
 
@@ -181,10 +190,10 @@ const DocumentItem = ({ documentName }) => {
       try {
         await Linking.openURL(url);
       } catch (error) {
-        Alert.alert('Error', 'No se pudo abrir la URL.');
+        showCustomAlert('Error', 'No se pudo abrir la URL.');
       }
     } else {
-      Alert.alert('Error', 'No se proporcionó una URL válida.');
+      showCustomAlert('Error', 'No se proporcionó una URL válida.');
     }
   };
 
@@ -193,7 +202,7 @@ const DocumentItem = ({ documentName }) => {
       const fileUris = documentData.imagenes.map((file) => `file://${RNFS.DocumentDirectoryPath}/DocSafe/${file}`);
 
       if (fileUris.length === 0) {
-        Alert.alert('Error', 'No hay archivos para compartir.');
+        showCustomAlert('Error', 'No hay archivos para compartir.');
         return;
       }
 
@@ -209,49 +218,49 @@ const DocumentItem = ({ documentName }) => {
       await Share.open(shareOptions);
     } catch (error) {
       console.error('Error al compartir el documento:', error);
-      Alert.alert('Error', 'No se pudo compartir el documento.');
+      showCustomAlert('Error', 'No se pudo compartir el documento.');
     }
   };
 
   const handleImageLoadError = () => {
-    Alert.alert('Error', 'El archivo no existe o no se pudo cargar.');
+    showCustomAlert('Error', 'El archivo no existe o no se pudo cargar.');
   };
 
   return (
     <View style={[styles.itemContainer, isExpired && styles.expiredContainer]}>
-    <TouchableOpacity style={styles.previewContainer} onPress={() => handleOpenDocument(0)}>
-    {fileType?.icon === faFileImage && images[0]?.uri ? (
-      <Image
-        source={{ uri: images[0]?.uri }}
-        style={styles.imagePreview}
-        onError={handleImageLoadError}
-      />
-    ) : (
-      <View style={[styles.iconContainer, { backgroundColor: fileType?.color || '#6c757d' }]}>
-        <FontAwesomeIcon 
-          icon={fileType?.icon || faFileAlt} 
-          size={24} 
-          color="#ffffff"
-        />
-      </View>
-    )}
-    <View style={styles.textContainer}>
-      <Text style={styles.documentName} numberOfLines={1}>{documentName}</Text>
-      {isExpired ? (
-        <Text style={styles.expiredText}>Documento expirado</Text> 
-      ) : (
-        <Text style={styles.documentDescription} numberOfLines={1}>{documentData?.descripcion}</Text>
-      )}
-    </View>
-  </TouchableOpacity>
-  
+      <TouchableOpacity style={styles.previewContainer} onPress={() => handleOpenDocument(0)}>
+        {fileType?.icon === faFileImage && images[0]?.uri ? (
+          <Image
+            source={{ uri: images[0]?.uri }}
+            style={styles.imagePreview}
+            onError={handleImageLoadError}
+          />
+        ) : (
+          <View style={[styles.iconContainer, { backgroundColor: fileType?.color || '#6c757d' }]}>
+            <FontAwesomeIcon 
+              icon={fileType?.icon || faFileAlt} 
+              size={24} 
+              color="#ffffff"
+            />
+          </View>
+        )}
+        <View style={styles.textContainer}>
+          <Text style={styles.documentName} numberOfLines={1}>{documentName}</Text>
+          {isExpired ? (
+            <Text style={styles.expiredText}>Documento expirado</Text> 
+          ) : (
+            <Text style={styles.documentDescription} numberOfLines={1}>{documentData?.descripcion}</Text>
+          )}
+        </View>
+      </TouchableOpacity>
+      
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.actionButton} onPress={handleViewDetails}>
           <FontAwesomeIcon icon={faEye} size={20} color="#185abd" />
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.actionButton} 
-          onPress={documentData?.url ? handleOpenURL : () => Alert.alert('Error', 'Este documento no tiene una URL asociada.')}
+          onPress={documentData?.url ? handleOpenURL : () => showCustomAlert('Error', 'Este documento no tiene una URL asociada.')}
           disabled={!documentData?.url}
         >
           <FontAwesomeIcon 
@@ -271,6 +280,7 @@ const DocumentItem = ({ documentName }) => {
           />
         </TouchableOpacity>
       </View>
+
       <CustomImageViewer
         visible={isImageViewerVisible}
         images={images}
@@ -278,6 +288,16 @@ const DocumentItem = ({ documentName }) => {
         onClose={() => setIsImageViewerVisible(false)}
         documentName={documentName} 
       />
+
+      {showAlert && (
+        <CustomAlert
+          visible={showAlert}
+          onClose={() => setShowAlert(false)}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          onAccept={() => setShowAlert(false)}
+        />
+      )}
     </View>
   );
 };

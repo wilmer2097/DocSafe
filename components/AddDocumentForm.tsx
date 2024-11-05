@@ -7,7 +7,8 @@ import ImageCropPicker from 'react-native-image-crop-picker';
 import RNFS from 'react-native-fs';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faSave, faTimesCircle, faCalendarAlt, faFileAlt, faShareAlt, faLink, faImage, faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileVideo, faFileAudio, faFileArchive, faFileCirclePlus, faEdit, faTrashAlt, faCamera, faImages, faFile } from '@fortawesome/free-solid-svg-icons';
-import ImageViewer from './ImageViewer';
+import CustomImageViewer from './CustomImageViewer'; 
+import CustomAlert from './CustomAlert';
 
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -62,6 +63,8 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   const [currentImageUri, setCurrentImageUri] = useState(0);
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false); 
   const [fileType, setFileType] = useState(null);
+  const [showAlert, setShowAlert] = useState(false);  // Estado para mostrar el CustomAlert
+  const [alertConfig, setAlertConfig] = useState({});  // Configuración del mensaje
 
   // Funciones para manejar las opciones seleccionadas
   const handleActionSheetPress = (option) => {
@@ -69,6 +72,15 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
     if (option === 'camera') openCamera(fileType);
     if (option === 'gallery') openGallery(fileType);
     if (option === 'files') openDocumentPicker(fileType);
+  };
+
+  // Función para mostrar el CustomAlert
+  const showCustomAlert = (title, message) => {
+    setAlertConfig({
+      title,
+      message,
+    });
+    setShowAlert(true);  // Mostrar la alerta
   };
 
   // Abrir la cámara con la funcionalidad de recorte
@@ -289,78 +301,95 @@ const renderDocumentFile = (file, fileType, index) => {
   
   const handleSave = async () => {
     if (!principalDocument && !url) {
-      Alert.alert('Error', 'Debe seleccionar al menos un documento principal o proporcionar una URL.');
+      showCustomAlert('Error', 'Debe seleccionar al menos un documento principal o proporcionar una URL válida.');
       return;
     }
   
+    // Validar la URL si fue ingresada
     if (url && !validateURL(url)) {
-      Alert.alert('Error', 'La URL del documento no es válida.');
+      showCustomAlert('Error', 'La URL del documento no es válida. Asegúrese de que tiene un formato correcto.');
       return;
     }
   
     if (!documentName) {
-      Alert.alert('Error', 'Debe proporcionar un nombre para el documento.');
+      showCustomAlert('Error', 'Debe proporcionar un nombre para el documento.');
       return;
     }
   
-    const folderPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
-    const assetsPath = `${RNFS.DocumentDirectoryPath}/assets`;
-    
-    // Asegúrate de que los directorios existan antes de escribir en ellos
-    await RNFS.mkdir(folderPath);
-    await RNFS.mkdir(assetsPath);
+    try {
+      const folderPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
+      const assetsPath = `${RNFS.DocumentDirectoryPath}/assets`;
   
-    const imagenes = [];
+      // Asegúrate de que las carpetas existan
+      await RNFS.mkdir(folderPath);
+      await RNFS.mkdir(assetsPath);
   
-    if (principalDocument) {
-      const principalFilePath = `${folderPath}/${principalDocument.name}`;
-      await RNFS.moveFile(principalDocument.uri, principalFilePath);
-      imagenes.push(principalDocument.name);
+      const imagenes = [];
+  
+      // Mover el documento principal, si existe
+      if (principalDocument) {
+        const principalFilePath = `${folderPath}/${principalDocument.name}`;
+        await RNFS.moveFile(principalDocument.uri, principalFilePath);
+        imagenes.push(principalDocument.name);
+      }
+  
+      const documentId = generateUUID();
+      const metadata = {
+        id_archivo: documentId,
+        nombre: documentName,
+        descripcion: description,
+        url: url || '',  // Asegúrate de que sea una cadena vacía si no hay URL
+        imagenes: imagenes,
+        fecha_creacion: new Date().toISOString(),
+        expiryDate: expiryDate.toISOString(),
+        share: share,
+      };
+  
+      const metadataPath = `${assetsPath}/archivos.json`;
+      let filesData = { archivos: [] };
+  
+      // Leer los datos existentes si el archivo ya existe
+      if (await RNFS.exists(metadataPath)) {
+        const existingData = await RNFS.readFile(metadataPath);
+        filesData = JSON.parse(existingData);
+      }
+  
+      filesData.archivos.push(metadata);
+  
+      // Escribe los nuevos datos en el archivo JSON
+      await RNFS.writeFile(metadataPath, JSON.stringify(filesData));
+  
+      console.log('Documento guardado con éxito:', metadata);
+  
+      // Mostrar mensaje de éxito y detener la navegación
+      showCustomAlert('Éxito', 'Documento agregado con éxito.');
+  
+    } catch (error) {
+      console.error('Error al guardar el documento:', error);
+      showCustomAlert('Error', 'Ocurrió un error al guardar el documento.');
     }
-  
-    if (secondaryDocument) {
-      const secondaryFilePath = `${folderPath}/${secondaryDocument.name}`;
-      await RNFS.moveFile(secondaryDocument.uri, secondaryFilePath);
-      imagenes.push(secondaryDocument.name);
-    }
-  
-    const documentId = generateUUID();
-    const metadata = {
-      id_archivo: documentId,
-      nombre: documentName,
-      descripcion: description,
-      url: url,
-      expiryDate: expiryDate.toISOString(),
-      share: share,
-      imagenes: imagenes,
-      fecha_creacion: new Date().toISOString(),
-    };
-  
-    const metadataPath = `${assetsPath}/archivos.json`;
-    
-    let filesData = { archivos: [] };
-    
-    // Verifica si el archivo ya existe antes de leerlo
-    if (await RNFS.exists(metadataPath)) {
-      const existingData = await RNFS.readFile(metadataPath);
-      filesData = JSON.parse(existingData);
-    }
-    
-    filesData.archivos.push(metadata);
-    
-    // Escribe los datos en el archivo JSON
-    await RNFS.writeFile(metadataPath, JSON.stringify(filesData));
-  
-    Alert.alert('Éxito', 'Documento agregado con éxito.');
-    onDocumentAdded();
-    onClose();
   };
   
+// Función para manejar el cierre de la alerta de éxito
+const handleAlertAccept = () => {
+  setShowAlert(false);
+
+  // Verifica si el título o el mensaje es de éxito
+  if (alertConfig.title === 'Éxito' && alertConfig.message.includes('Documento agregado con éxito')) {
+    console.log('Navegando a la pantalla anterior después del éxito');
+    onDocumentAdded();  // Dispara la función para actualizar la lista de documentos
+    onClose();  // Navega a la pantalla anterior
+  } else {
+    console.log('Cerrando alerta de error, sin navegar');
+    // Aquí simplemente se cierra la alerta sin navegar si es un error
+  }
+};
+
   
   
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView contentContainerStyle={styles.container} scrollEnabled={!isImageViewerVisible}>
       <Text style={styles.title}>Agregar Documento</Text>
 
       <View style={styles.inputContainer}>
@@ -382,7 +411,16 @@ const renderDocumentFile = (file, fileType, index) => {
           ? renderDocumentFile(secondaryDocument, 'secondary', 1)
           : renderAddFileIcon('Secundario/Reverso')}
       </View>
-
+      {/* Mostrar CustomAlert */}
+      {showAlert && (
+        <CustomAlert
+        visible={showAlert}
+        onClose={() => setShowAlert(false)}  // Para los casos de error, simplemente cerrar
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onAccept={handleAlertAccept}  // Manejar la navegación solo si es éxito
+      />
+      )}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Comentario:</Text>
         <TextInput
@@ -482,19 +520,22 @@ const renderDocumentFile = (file, fileType, index) => {
           </View>
         </View>
       </Modal>
-    
-      <Modal visible={isImageViewerVisible} transparent={true} animationType="slide">
-        <ImageViewer
-          visible={isImageViewerVisible}
-          images={[
-            principalDocument && { uri: principalDocument.uri },
-            secondaryDocument && { uri: secondaryDocument?.uri }
-          ].filter(Boolean)} 
-          initialIndex={currentImageUri}
-          onClose={() => setIsImageViewerVisible(false)} 
-        />
-      </Modal>
-
+      <Modal
+      visible={isImageViewerVisible}
+      transparent={true}
+      animationType="slide"
+      onRequestClose={() => setIsImageViewerVisible(false)}
+    >
+      <CustomImageViewer
+        visible={isImageViewerVisible}
+        images={[
+          principalDocument && { uri: principalDocument.uri },
+          secondaryDocument && { uri: secondaryDocument?.uri }
+        ].filter(Boolean)}  // Solo mostrar imágenes válidas
+        initialIndex={currentImageUri}
+        onClose={() => setIsImageViewerVisible(false)}  // Cerrar el visor de imágenes
+      />
+    </Modal>
     </ScrollView>
   );
 };
