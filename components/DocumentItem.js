@@ -207,7 +207,7 @@ const DocumentItem = ({ documentName }) => {
       const shareOptions = {
         title: 'Compartir Documento',
         urls: fileUris,
-        message: `Mira este documento: ${documentName}`,
+        message: `Documento: ${documentName}`,
         type: mimeType,
       };
 

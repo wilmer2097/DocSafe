@@ -161,7 +161,7 @@ const HomeScreen = () => {
       </View>
       <FlatList
         data={documents}
-        keyExtractor={(item) => item.name}
+        keyExtractor={(item) => item.id_archivo}
         renderItem={({ item }) => (
           <View style={styles.itemContainer}>
             <DocumentItem 

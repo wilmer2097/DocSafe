@@ -104,7 +104,7 @@ const CustomDrawerContent = (props) => {
           <View style={styles.infoContainer}>
             <Text style={styles.creatorText}>STEC - Perú</Text>
             <Text style={styles.subText}>Fábrica de software</Text>
-            <Text style={styles.yearText}>(c) 2024</Text>
+            <Text style={styles.yearText}>© 2024</Text>
           </View>
         </TouchableOpacity>
       </View>

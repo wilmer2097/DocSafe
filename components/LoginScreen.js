@@ -146,17 +146,15 @@ const LoginScreen = ({ navigation }) => {
       return;
     }
   
-    const rnBiometrics = new ReactNativeBiometrics();
-  
     try {
       const { success } = await rnBiometrics.simplePrompt({
-        promptMessage: 'Verifica tu identidad con la huella digital',
+        promptMessage: 'Verifica tu identidad con Face ID / Touch ID',
       });
   
       if (success) {
         navigation.navigate('Home');
       } else {
-        showCustomAlert('Error', 'La autenticación biométrica falló. Inténtalo de nuevo.');
+        showCustomAlert('Error', 'Autenticación biométrica fallida.');
       }
     } catch (error) {
       console.error('Error durante la autenticación biométrica:', error);

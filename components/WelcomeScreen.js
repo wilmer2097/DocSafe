@@ -59,7 +59,7 @@ const WelcomeScreen = () => {
         </View>
 
         <Text style={styles.tagline}>
-          DocSafe (c) STEC{"\n"}Gestor documentos personales
+          DocSafe © STEC{"\n"}Gestor documentos personales
         </Text>
 
         <View style={styles.carouselWrapper}>

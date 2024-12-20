@@ -6,6 +6,9 @@ import CustomAlert from './CustomAlert';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import CheckBox from '@react-native-community/checkbox';
 
+// Importar react-native-localize
+import * as RNLocalize from 'react-native-localize';
+
 const countryDataList = [
   { dial_code: '+1', flag: '🇺🇸', name: 'United States' },
   { dial_code: '+51', flag: '🇵🇪', name: 'Peru' },
@@ -31,6 +34,32 @@ const countryDataList = [
   { dial_code: '+34', flag: '🇪🇸', name: 'Spain' },
 ];
 
+// Mapa de código de país (ISO) a dial_code
+const countryCodeMap = {
+  US: '+1',
+  PE: '+51',
+  MX: '+52',
+  AR: '+54',
+  BR: '+55',
+  CL: '+56',
+  CO: '+57',
+  VE: '+58',
+  GT: '+502',
+  SV: '+503',
+  HN: '+504',
+  NI: '+505',
+  CR: '+506',
+  PA: '+507',
+  HT: '+509',
+  GY: '+592',
+  EC: '+593',
+  GF: '+594',
+  PY: '+595',
+  SR: '+597',
+  UY: '+598',
+  ES: '+34',
+};
+
 const ProfileScreen = ({ navigation }) => {
   const [profile, setProfile] = useState({
     name: '',
@@ -38,7 +67,7 @@ const ProfileScreen = ({ navigation }) => {
     loginCode: '',
     ciudad: '',
     telefono: '',
-    codigoPais: '+1',
+    codigoPais: '+51',
     correo: '',
     biometricsEnabled: false,
     fec_ini: '',
@@ -53,7 +82,7 @@ const ProfileScreen = ({ navigation }) => {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertData, setAlertData] = useState({ title: '', message: '', token: '' });
   const [showCountryPicker, setShowCountryPicker] = useState(false);
-  const [selectedCountry, setSelectedCountry] = useState({ flag: '🇺🇸', dial_code: '+1' });
+  const [selectedCountry, setSelectedCountry] = useState({ flag: '🇵🇪', dial_code: '+51' });
   const [initialLoginCode, setInitialLoginCode] = useState('');
 
   useEffect(() => {
@@ -66,7 +95,7 @@ const ProfileScreen = ({ navigation }) => {
           setProfile(prev => ({ ...prev, ...savedProfile }));
           setInitialLoginCode(savedProfile.loginCode);
 
-          // Buscar la bandera correspondiente al código de país
+          // Usa el codigoPais guardado
           const countryData = countryDataList.find(country => country.dial_code === savedProfile.codigoPais);
           if (countryData) {
             setSelectedCountry({ flag: countryData.flag, dial_code: savedProfile.codigoPais });
@@ -74,6 +103,18 @@ const ProfileScreen = ({ navigation }) => {
 
           setFirstTime(false);
         } else {
+          // No existe perfil guardado, usar región del dispositivo
+          const deviceCountry = RNLocalize.getCountry(); // Ej: "PE"
+          const dialCode = countryCodeMap[deviceCountry] || '+51'; // Si no se encuentra el país, usar '+51'
+          const countryData = countryDataList.find(country => country.dial_code === dialCode);
+          if (countryData) {
+            setSelectedCountry({ flag: countryData.flag, dial_code: dialCode });
+            handleChange('codigoPais', dialCode);
+          } else {
+            // Si no se encuentra el país en la lista, usar el por defecto
+            setSelectedCountry({ flag: '🇵🇪', dial_code: '+51' });
+            handleChange('codigoPais', '+51');
+          }
           setFirstTime(true);
         }
       } catch (error) {
@@ -157,7 +198,7 @@ const ProfileScreen = ({ navigation }) => {
         cliente_id: profile.clienteId,
         nombre: profile.name,
         correo: profile.correo,
-        telefono: `${selectedCountry.dial_code} ${profile.telefono}`,
+        telefono: profile.telefono,
         codigoPais: selectedCountry.dial_code,
         ciudad: profile.ciudad,
         tec_ope_pass: profile.loginCode,

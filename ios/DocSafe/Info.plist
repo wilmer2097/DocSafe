@@ -43,14 +43,18 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
+		<!-- <string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string> -->
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-    <string>Se necesita acceso a la cámara para tomar fotos.</string>
-    <key>NSPhotoLibraryUsageDescription</key>
-    <string>Se necesita acceso a la galería para seleccionar fotos.</string>
+  <string>Se necesita acceso a la cámara para tomar fotos.</string>
+  <key>NSFaceIDUsageDescription</key>
+  <string>Se necesita acceso para el inicio de sesión opcional.</string>
+  <key>NSPhotoLibraryUsageDescription</key>
+  <string>Se necesita acceso a la galería para seleccionar fotos.</string>
+  <key>NSPhotoLibraryAddUsageDescription</key>
+  <string>Se necesita acceso a la galería para seleccionar fotos.</string>
 </dict>
 </plist>

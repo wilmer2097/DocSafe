@@ -49,7 +49,7 @@ const ArchivedDocuments = () => {
     <View style={styles.container}>
       <FlatList
         data={archivedDocuments}
-        keyExtractor={(item) => item.name}
+        keyExtractor={(item) => item.id_archivo}
         renderItem={({ item }) => (
           <View style={styles.itemContainer}>
             <DocumentItem 

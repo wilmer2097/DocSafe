@@ -1,13 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Image, Modal, ScrollView } from 'react-native';
+import React, { useState, useEffect, useRef  } from 'react';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, Switch, Image, Modal, ScrollView, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import RNFS from 'react-native-fs';
 import DocumentPicker from 'react-native-document-picker';
-import { launchCamera, launchImageLibrary} from 'react-native-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import CustomImageViewer from './CustomImageViewer';
 import CustomAlert from './CustomAlert'; // Importación de CustomAlert
+import ImageCropPicker from 'react-native-image-crop-picker';
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 
 import { 
@@ -52,6 +53,51 @@ const DocumentDetail = () => {
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [currentImageUri, setCurrentImageUri] = useState(0);
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
+  const [editingFileIndex, setEditingFileIndex] = useState(null);
+
+  const checkAndRequestPermission = async (permission) => {
+    const result = await check(permission);
+    switch (result) {
+      case RESULTS.UNAVAILABLE:
+        Alert.alert('Permiso no disponible', 'Este permiso no está disponible en este dispositivo.');
+        return false;
+      case RESULTS.DENIED:
+        const requestResult = await request(permission);
+        return requestResult === RESULTS.GRANTED;
+      case RESULTS.LIMITED:
+        return true;
+      case RESULTS.GRANTED:
+        return true;
+      case RESULTS.BLOCKED:
+        Alert.alert('Permiso bloqueado', 'Debe habilitar el permiso en la configuración para usar esta función.');
+        return false;
+    }
+  };
+
+  const requestPermission = async (type) => {
+    if (Platform.OS === 'ios') {
+      if (type === 'gallery') {
+        return await checkAndRequestPermission(PERMISSIONS.IOS.PHOTO_LIBRARY);
+      } else if (type === 'camera') {
+        return await checkAndRequestPermission(PERMISSIONS.IOS.CAMERA);
+      }
+    } else {
+      const androidVersion = Platform.Version;
+      if (type === 'gallery') {
+        if (androidVersion >= 33) {
+          return await checkAndRequestPermission(PERMISSIONS.ANDROID.READ_MEDIA_IMAGES);
+        } else {
+          return await checkAndRequestPermission(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
+        }
+      } else if (type === 'camera') {
+        return await checkAndRequestPermission(PERMISSIONS.ANDROID.CAMERA);
+      } else if (type === 'files') {
+        // Normalmente DocumentPicker no requiere permisos adicionales
+        return true; 
+      }
+    }
+  };
+
   useEffect(() => {
     const loadDocumentData = async () => {
       const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
@@ -81,39 +127,67 @@ const DocumentDetail = () => {
     loadDocumentData();
   }, [document.id_archivo]);
   
-  const abrirCamara = async () => {
-    try {
-      const image = await launchCamera({ mediaType: 'photo', saveToPhotos: true });
-      if (image.assets && image.assets.length > 0) {
-        const fileName = `camera_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-        const filePath = image.assets[0].uri;
-        const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
-        await RNFS.copyFile(filePath, destinationPath);
 
-        handleFileSelection(destinationPath);
-      }
+  const documentNameRef = useRef(null);
+  const descriptionRef = useRef(null);
+  const urTextlRef = useRef(null);
+
+  const abrirCamara = async () => {
+
+    documentNameRef.current?.blur();
+    descriptionRef.current?.blur();
+    urTextlRef.current?.blur();
+
+    try {
+      const imagen = await ImageCropPicker.openCamera({
+        cropping: true,
+        freeStyleCropEnabled: true,
+        includeBase64: false,
+        compressImageQuality: 0.8,
+      });
+  
+      const nombreArchivoUnico = `camera_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+      const filePath = imagen.path;
+      const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${nombreArchivoUnico}`;
+      await RNFS.copyFile(filePath, destinationPath);
+  
+      handleFileSelection(destinationPath);
     } catch (error) {
       console.error('Error capturando la imagen con la cámara:', error);
     }
   };
 
   const abrirGaleria = async () => {
+    
+    documentNameRef.current?.blur();
+    descriptionRef.current?.blur();
+    urTextlRef.current?.blur();
+    
     try {
-      const image = await launchImageLibrary({ mediaType: 'photo' });
-      if (image.assets && image.assets.length > 0) {
-        const fileName = image.assets[0].fileName || `gallery_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-        const filePath = image.assets[0].uri;
-        const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
-        await RNFS.copyFile(filePath, destinationPath);
-
-        handleFileSelection(destinationPath);
-      }
+      const imagen = await ImageCropPicker.openPicker({
+        cropping: true,
+        freeStyleCropEnabled: true,
+        includeBase64: false,
+        compressImageQuality: 0.8,
+      });
+  
+      const nombreArchivoOriginal = imagen.filename || `gallery_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+      const filePath = imagen.path;
+      const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${nombreArchivoOriginal}`;
+      await RNFS.copyFile(filePath, destinationPath);
+  
+      handleFileSelection(destinationPath);
     } catch (error) {
       console.error('Error seleccionando la imagen de la galería:', error);
     }
   };
 
   const abrirDocumentos = async () => {
+
+    documentNameRef.current?.blur();
+    descriptionRef.current?.blur();
+    urTextlRef.current?.blur();
+    
     try {
       const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
       if (result && result[0]) {
@@ -132,20 +206,49 @@ const DocumentDetail = () => {
   };
 
   const handleFileSelection = (newFilePath) => {
-    const updatedFiles = [...documentFiles];
+    let updatedFiles = [...documentFiles];
+
     if (fileType === 'principal') {
-      updatedFiles[0] = newFilePath;
-    } else {
-      updatedFiles.push(newFilePath);
+      updatedFiles[0] = newFilePath; 
+    } else if (fileType === 'secondary') {
+      if (updatedFiles.length > 1) {
+        updatedFiles[1] = newFilePath; 
+      } else {
+        updatedFiles.push(newFilePath); 
+      }
     }
+  
     setDocumentFiles(updatedFiles);
     setIsActionSheetVisible(false);
   };
-  const handleActionSheetPress = (option) => {
-    if (option === 'camera') abrirCamara();
-    if (option === 'gallery') abrirGaleria();
-    if (option === 'files') abrirDocumentos();
-    setIsActionSheetVisible(false); // Cierra el action sheet después de la selección
+  
+  
+  const handleActionSheetPress = async (option) => {
+    setIsActionSheetVisible(false);
+    let permissionResult;
+
+    switch (option) {
+      case 'camera':
+        permissionResult = await requestPermission('camera');
+        if (permissionResult) {
+          abrirCamara();
+        } else {
+          Alert.alert('Permiso denegado', 'Se necesita acceso a la cámara para tomar fotos.');
+        }
+        break;
+      case 'gallery':
+        permissionResult = await requestPermission('gallery');
+        if (permissionResult) {
+          abrirGaleria();
+        } else {
+          Alert.alert('Permiso denegado', 'Se necesita acceso a la galería para seleccionar fotos.');
+        }
+        break;
+      case 'files':
+        // Normalmente no se necesita permiso adicional para el DocumentPicker
+        abrirDocumentos();
+        break;
+    }
   };
 
   const saveDocumentData = async () => {
@@ -196,32 +299,6 @@ const DocumentDetail = () => {
   };
   
 
-  const handleCaptureImage = async () => {
-    const options = {
-      mediaType: 'photo',
-      saveToPhotos: true, // Opcional, para guardar en la galería del usuario
-    };
-  
-    const result = await launchCamera(options);
-  
-    if (result.assets && result.assets.length > 0) {
-      const fileName = result.assets[0].fileName || `camera_photo_${Date.now()}.jpg`; // Usar el nombre original o generar uno único
-      const filePath = result.assets[0].uri;
-      const newFilePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
-      
-      await RNFS.copyFile(filePath, newFilePath);
-  
-      const updatedFiles = [...documentFiles];
-      if (!updatedFiles[0]) {
-        updatedFiles[0] = newFilePath;
-      } else {
-        updatedFiles.push(newFilePath);
-      }
-  
-      setDocumentFiles(updatedFiles);
-      showCustomAlert('Éxito', 'Foto capturada y guardada correctamente.');
-    }
-  };
   // Estado para la alerta personalizada
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
@@ -250,7 +327,7 @@ const DocumentDetail = () => {
             if (file) await RNFS.unlink(file);
           }
 
-          showCustomAlert('Éxito', 'Documento eliminado correctamente.', true);
+          showCustomAlert('Éxito', 'Documento eliminado correctamente.', false);
           onGoBack?.();
           navigation.goBack();
         } else {
@@ -268,42 +345,7 @@ const DocumentDetail = () => {
     return pattern.test(url);
   };
 
-  const handleFileOperation = async (operationType, file, index) => {
-    try {
-      const result = await DocumentPicker.pick({
-        type: [DocumentPicker.types.images], // O el tipo que necesites
-      });
-  
-      if (result && result.length > 0) {
-        const fileName = result[0].name; // Obtener el nombre original del archivo
-        const newFilePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
-        await RNFS.copyFile(result[0].uri, newFilePath);
-  
-        if (operationType === 'edit') {
-          const updatedFiles = [...documentFiles];
-          updatedFiles[index] = newFilePath;
-          setDocumentFiles(updatedFiles);
-          showCustomAlert('Éxito', 'Archivo actualizado correctamente.');
-        } else if (operationType === 'add') {
-          const updatedFiles = [...documentFiles];
-  
-          if (!updatedFiles[0]) {
-            updatedFiles[0] = newFilePath;
-          } else {
-            updatedFiles.push(newFilePath);
-          }
-  
-          setDocumentFiles(updatedFiles);
-          showCustomAlert('Éxito', 'Archivo agregado correctamente.');
-        }
-      }
-    } catch (error) {
-      if (!DocumentPicker.isCancel(error)) {
-        console.error(`Error al ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo:`, error);
-        showCustomAlert('Error', `No se pudo ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo.`);
-      }
-    }
-  };
+
 
   const handleShare = async (file) => {
     if (!file) {
@@ -318,7 +360,7 @@ const DocumentDetail = () => {
       const shareOptions = {
         title: 'Archivar Documento',
         urls: [fileUri],
-        message: `Mira este documento: ${name}`,
+        message: `Documento: ${name}`,
         type: mimeType,
       };
   
@@ -381,19 +423,14 @@ const DocumentDetail = () => {
         await RNFS.unlink(file);
       }
       const updatedFiles = documentFiles.filter((_, i) => i !== index);
-
-      if (index === 0) {
-        setDocumentFiles([null, ...updatedFiles]);
-      } else {
-        setDocumentFiles(updatedFiles);
-      }
-
-      showCustomAlert('Éxito', 'Archivo eliminado correctamente.', true);
+      setDocumentFiles(updatedFiles);
+      showCustomAlert('Éxito', 'Archivo eliminado correctamente.', false);
     } catch (error) {
       console.error('Error al eliminar el archivo:', error);
       showCustomAlert('Error', 'No se pudo eliminar el archivo.');
     }
   };
+  
 
   const getFileType = (fileName) => {
     if (!fileName) return { icon: faFileAlt, color: '#6c757d' };
@@ -447,9 +484,14 @@ const DocumentDetail = () => {
           )}
         </TouchableOpacity>
         <View style={styles.iconActions}>
-          <TouchableOpacity onPress={() => handleFileOperation('edit', file, index)} style={styles.iconButton}>
-            <FontAwesomeIcon icon={faEdit} size={20} color="#185abd" />
-          </TouchableOpacity>
+        <TouchableOpacity onPress={() => {
+          setFileType(index === 0 ? 'principal' : 'secondary');  // Define si el archivo es principal o secundario basado en el índice
+          setEditingFileIndex(index);  // Guarda el índice del archivo que se va a editar
+          setIsActionSheetVisible(true);  // Abre el modal para seleccionar el nuevo archivo
+        }} style={styles.iconButton}>
+          <FontAwesomeIcon icon={faEdit} size={20} color="#185abd" />
+        </TouchableOpacity>
+        
           <TouchableOpacity onPress={() => deleteFile(file, index)} style={styles.iconButton}>
             <FontAwesomeIcon icon={faTrashAlt} size={20} color="#cc0000" />
           </TouchableOpacity>
@@ -498,6 +540,7 @@ const DocumentDetail = () => {
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Nombre del documento:</Text>
         <TextInput
+          ref={documentNameRef}
           style={styles.input}
           placeholder="Nombre del documento"
           value={name}
@@ -516,6 +559,7 @@ const DocumentDetail = () => {
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Comentario:</Text>
         <TextInput
+          ref={descriptionRef}
           style={styles.textArea}
           placeholder="Comentario"
           value={description}
@@ -529,6 +573,7 @@ const DocumentDetail = () => {
         <Text style={styles.label}>Sitio web de consulta del documento:</Text>
         <View style={styles.urlContainer}>
           <TextInput
+            ref={urTextlRef}
             style={[styles.input, styles.urlInput]}
             placeholder="URL (Opcional)"
             value={url}

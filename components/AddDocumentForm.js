@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, Switch, Alert, Image, StyleSheet, ScrollView, Modal } from 'react-native';
+import React, { useState, useRef } from 'react'; 
+import { View, Text, TextInput, TouchableOpacity, Switch, Alert, Image, StyleSheet, ScrollView, Modal, Platform } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import DocumentPicker from 'react-native-document-picker';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import ImageCropPicker from 'react-native-image-crop-picker';
 import RNFS from 'react-native-fs';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faSave, faTimesCircle, faCalendarAlt, faFileAlt, faShareAlt, faLink, faImage, faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileVideo, faFileAudio, faFileArchive, faFileCirclePlus, faEdit, faTrashAlt, faCamera, faImages, faFile } from '@fortawesome/free-solid-svg-icons';
 import CustomImageViewer from './CustomImageViewer'; 
 import CustomAlert from './CustomAlert';
+
+import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -65,14 +66,80 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   const [fileType, setFileType] = useState(null);
   const [showAlert, setShowAlert] = useState(false);  // Estado para mostrar el CustomAlert
   const [alertConfig, setAlertConfig] = useState({});  // Configuración del mensaje
+  const [editingFileIndex, setEditingFileIndex] = useState(null);
 
-  // Funciones para manejar las opciones seleccionadas
-  const handleActionSheetPress = (option) => {
-    setIsActionSheetVisible(false);
-    if (option === 'camera') openCamera(fileType);
-    if (option === 'gallery') openGallery(fileType);
-    if (option === 'files') openDocumentPicker(fileType);
+  const requestPermission = async (type) => {
+    if (Platform.OS === 'ios') {
+      if (type === 'gallery') {
+        return await checkAndRequestPermission(PERMISSIONS.IOS.PHOTO_LIBRARY);
+      } else if (type === 'camera') {
+        return await checkAndRequestPermission(PERMISSIONS.IOS.CAMERA);
+      }
+    } else {
+      // Para Android, detecta la versión
+      const androidVersion = Platform.Version;
+      if (type === 'gallery') {
+        if (androidVersion >= 33) {
+          // Android 13 o superior
+          return await checkAndRequestPermission(PERMISSIONS.ANDROID.READ_MEDIA_IMAGES);
+        } else {
+          // Android 12 o inferior
+          return await checkAndRequestPermission(PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE);
+        }
+      } else if (type === 'camera') {
+        return await checkAndRequestPermission(PERMISSIONS.ANDROID.CAMERA);
+      }
+    }
   };
+    
+  const checkAndRequestPermission = async (permission) => {
+    const result = await check(permission);
+    switch (result) {
+      case RESULTS.UNAVAILABLE:
+        Alert.alert('Permiso no disponible', 'Este permiso no está disponible en este dispositivo.');
+        return false;
+      case RESULTS.DENIED:
+        const requestResult = await request(permission);
+        return requestResult === RESULTS.GRANTED;
+      case RESULTS.LIMITED:
+        return true;
+      case RESULTS.GRANTED:
+        return true;
+      case RESULTS.BLOCKED:
+        Alert.alert('Permiso bloqueado', 'Debe habilitar el permiso en la configuración para usar esta función.');
+        return false;
+    }
+  };
+  // Funciones para manejar las opciones seleccionadas
+  const handleActionSheetPress = async (option) => {
+    setIsActionSheetVisible(false);
+    let permissionResult;
+
+    switch (option) {
+      case 'camera':
+        permissionResult = await requestPermission('camera');
+        if (permissionResult) {
+          abrirCamara(fileType);
+        } else {
+          Alert.alert('Permiso denegado', 'Se necesita acceso a la cámara para tomar fotos.');
+        }
+        break;
+      case 'gallery':
+        permissionResult = await requestPermission('gallery');
+        if (permissionResult) {
+          abrirGaleria(fileType);
+        } else {
+          Alert.alert('Permiso denegado', 'Se necesita acceso a la galería para seleccionar fotos.');
+        }
+        break;
+      case 'files':
+        abrirSelectorDocumentos(fileType);
+        break;
+    }
+  };
+
+  
+
 
   // Función para mostrar el CustomAlert
   const showCustomAlert = (title, message) => {
@@ -83,116 +150,86 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
     setShowAlert(true);  // Mostrar la alerta
   };
 
-  // Abrir la cámara con la funcionalidad de recorte
-  const openCamera = async (type) => {
-    try {
-      const image = await ImageCropPicker.openCamera({
-        cropping: true,
-        freeStyleCropEnabled: true,
-        includeBase64: false,
-        compressImageQuality: 0.8,
-      });
-  
-      // Genera un nombre único basado en la fecha y la hora actual para las fotos de la cámara
-      const uniqueFileName = `camera_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-  
-      if (type === 'principal') {
-        setPrincipalDocument({ uri: image.path, name: uniqueFileName, type: image.mime });
-      } else if (type === 'secondary') {
-        setSecondaryDocument({ uri: image.path, name: uniqueFileName, type: image.mime });
-      }
-    } catch (error) {
-      console.log('Error capturando la imagen con la cámara', error);
-    }
-  };
-  const handleCaptureImage = async () => {
-    const options = {
-      mediaType: 'photo',
-      saveToPhotos: true, // Guarda en la galería si es necesario
-    };
-    const result = await launchCamera(options);
+ // Abrir la cámara con funcionalidad de recorte
+const abrirCamara = async (tipo) => {
 
-    if (result.assets && result.assets.length > 0) {
-      // Genera un nombre único basado en la fecha y hora actual
-      const fileName = `camera_photo_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`; 
-      const filePath = result.assets[0].uri;
-      const newFilePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
-  
-      // Guarda la imagen en la carpeta DocSafe
-      await RNFS.copyFile(filePath, newFilePath);
-  
-      const updatedFiles = [...documentFiles];
-      if (!updatedFiles[0]) {
-        updatedFiles[0] = newFilePath;
-      } else {
-        updatedFiles.push(newFilePath);
-      }
-  
-      setDocumentFiles(updatedFiles);
-      Alert.alert('Éxito', 'Foto capturada y guardada correctamente.');
-    }
-  };
+  documentNameRef.current?.blur();
+  descriptionRef.current?.blur();
+  urTextlRef.current?.blur();
 
-  // Abrir la galería
-  const openGallery = async (type) => {
-    try {
-      const image = await ImageCropPicker.openPicker({
-        cropping: true,
-        freeStyleCropEnabled: true,
-        includeBase64: false,
-        compressImageQuality: 0.8,
-      });
-  
-      // Preserva el nombre del archivo original para las imágenes de la galería
-      const originalFileName = image.filename || `gallery_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
-  
-      if (type === 'principal') {
-        setPrincipalDocument({ uri: image.path, name: originalFileName, type: image.mime });
-      } else if (type === 'secondary') {
-        setSecondaryDocument({ uri: image.path, name: originalFileName, type: image.mime });
-      }
-    } catch (error) {
-      console.log('Error seleccionando la imagen de la galería', error);
-    }
-  };
-  
-
-// Abrir el selector de documentos
-const openDocumentPicker = async (type) => {
   try {
-    const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
-    if (result && result[0]) {
-      if (type === 'principal') {
-        setPrincipalDocument(result[0]);
-      } else if (type === 'secondary') {
-        setSecondaryDocument(result[0]);
-      }
-    }
-  } catch (error) {
-    if (!DocumentPicker.isCancel(error)) {
-      Alert.alert('Error', 'No se pudo seleccionar el documento.');
-    }
-  }
-};
-
-const handlePickDocument = async (type) => {
-  try {
-    const result = await DocumentPicker.pick({
-      type: [DocumentPicker.types.allFiles],
+    const imagen = await ImageCropPicker.openCamera({
+      cropping: true,
+      freeStyleCropEnabled: true,
+      includeBase64: false,
+      compressImageQuality: 0.8,
     });
-    if (result && result[0]) {
-      if (type === 'principal') {
-        setPrincipalDocument(result[0]);
-      } else if (type === 'secondary') {
-        setSecondaryDocument(result[0]);
+
+    // Genera un nombre único basado en la fecha y hora actual para las fotos tomadas
+    const nombreArchivoUnico = `camera_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+
+    if (tipo === 'principal') {
+      setPrincipalDocument({ uri: imagen.path, name: nombreArchivoUnico, type: imagen.mime });
+    } else if (tipo === 'secondary') {
+      setSecondaryDocument({ uri: imagen.path, name: nombreArchivoUnico, type: imagen.mime });
+    }
+  } catch (error) {
+    console.log('Error al capturar la imagen con la cámara', error);
+  }
+};
+
+// Abrir la galería
+const abrirGaleria = async (tipo) => {
+  
+  documentNameRef.current?.blur();
+  descriptionRef.current?.blur();
+  urTextlRef.current?.blur();
+
+  try {
+    const imagen = await ImageCropPicker.openPicker({
+      cropping: true,
+      freeStyleCropEnabled: true,
+      includeBase64: false,
+      compressImageQuality: 0.8,
+    });
+
+    // Preserva el nombre original del archivo para las imágenes de la galería
+    const nombreArchivoOriginal = imagen.filename || `gallery_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
+
+    if (tipo === 'principal') {
+      setPrincipalDocument({ uri: imagen.path, name: nombreArchivoOriginal, type: imagen.mime });
+    } else if (tipo === 'secondary') {
+      setSecondaryDocument({ uri: imagen.path, name: nombreArchivoOriginal, type: imagen.mime });
+    }
+  } catch (error) {
+    console.log('Error al seleccionar la imagen de la galería', error);
+  }
+};
+// Abrir el selector de documentos
+const abrirSelectorDocumentos = async (tipo) => {
+
+  documentNameRef.current?.blur();
+  descriptionRef.current?.blur();
+  urTextlRef.current?.blur();
+
+  try {
+    const resultado = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
+    if (resultado && resultado[0]) {
+      const archivo = resultado[0];
+      if (tipo === 'principal') {
+        setPrincipalDocument(archivo);
+      } else if (tipo === 'secondary') {
+        setSecondaryDocument(archivo);
       }
     }
   } catch (error) {
     if (!DocumentPicker.isCancel(error)) {
-      Alert.alert('Error', 'No se pudo seleccionar el documento.');
+      console.error("Error seleccionando archivo:", error);
+      Alert.alert('Error', `No se pudo seleccionar el documento: ${error.message || error}`);
     }
   }
 };
+
 
 const handleFilePress = (file, index) => {
   const isImage = file?.type?.startsWith('image/');
@@ -210,44 +247,6 @@ const deleteFile = (fileType) => {
   }
 };
 
-// Función para manejar la operación de agregar o reemplazar archivos
-const handleFileOperation = async (operationType, file, index) => {
-  try {
-    const result = await DocumentPicker.pick({
-      type: [DocumentPicker.types.images], // Cambia el tipo de archivo si es necesario
-    });
-
-    if (result && result.length > 0) {
-      const fileName = result[0].name; // Obtiene el nombre original del archivo
-      const newFilePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
-
-      // Copia el archivo seleccionado a la ruta de destino
-      await RNFS.copyFile(result[0].uri, newFilePath);
-
-      if (operationType === 'edit') {
-        const updatedFiles = [...documentFiles];
-        updatedFiles[index] = newFilePath;
-        setDocumentFiles(updatedFiles);
-        Alert.alert('Éxito', 'Archivo actualizado correctamente.');
-      } else if (operationType === 'add') {
-        const updatedFiles = [...documentFiles];
-        if (!updatedFiles[0]) {
-          updatedFiles[0] = newFilePath;
-        } else {
-          updatedFiles.push(newFilePath);
-        }
-
-        setDocumentFiles(updatedFiles);
-        Alert.alert('Éxito', 'Archivo agregado correctamente.');
-      }
-    }
-  } catch (error) {
-    if (!DocumentPicker.isCancel(error)) {
-      console.error(`Error al ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo:`, error);
-      Alert.alert('Error', `No se pudo ${operationType === 'edit' ? 'reemplazar' : 'agregar'} el archivo.`);
-    }
-  }
-};
 
 
 const renderDocumentFile = (file, fileType, index) => {
@@ -258,7 +257,7 @@ const renderDocumentFile = (file, fileType, index) => {
   const isImage = file?.type?.startsWith('image/');
 
   return (
-    <View key={index} style={styles.documentSection}>
+    <View key={`${fileType}-${index}`} style={styles.documentSection}>
       <Text style={styles.sectionLabel}>{fileType === 'principal' ? 'Principal/Anverso' : 'Secundario/Reverso'}</Text>
       <TouchableOpacity onPress={() => handleFilePress(file, index)} style={styles.fileContainer}>
         {isImage ? (
@@ -268,9 +267,13 @@ const renderDocumentFile = (file, fileType, index) => {
         )}
       </TouchableOpacity>
       <View style={styles.iconActions}>
-        <TouchableOpacity onPress={() => handlePickDocument(fileType)} style={styles.iconButton}>
-          <FontAwesomeIcon icon={faEdit} size={20} color="#185abd" />
-        </TouchableOpacity>
+      <TouchableOpacity onPress={() => {
+        setFileType(index === 0 ? 'principal' : 'secondary');  // Define si el archivo es principal o secundario basado en el índice
+        setEditingFileIndex(index);  // Guarda el índice del archivo que se va a editar
+        setIsActionSheetVisible(true);  // Abre el modal para seleccionar el nuevo archivo
+      }} style={styles.iconButton}>
+        <FontAwesomeIcon icon={faEdit} size={20} color="#185abd" />
+      </TouchableOpacity>      
         <TouchableOpacity onPress={() => deleteFile(fileType)} style={styles.iconButton}>
           <FontAwesomeIcon icon={faTrashAlt} size={20} color="#cc0000" />
         </TouchableOpacity>
@@ -281,7 +284,7 @@ const renderDocumentFile = (file, fileType, index) => {
 
 
   const renderAddFileIcon = (label) => (
-    <View style={styles.documentSection}>
+    <View key={label} style={styles.documentSection}>
       <Text style={styles.sectionLabel}>{label}</Text>
       <TouchableOpacity
         onPress={() => {
@@ -295,7 +298,7 @@ const renderDocumentFile = (file, fileType, index) => {
     </View>
   );
   const validateURL = (url) => {
-    const pattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
+    const pattern = /^(https?:\/\/)?([\w\d\-]+\.)+[\w]{2,}(\/\S*)?$/;
     return pattern.test(url);
   };
   
@@ -393,6 +396,9 @@ const handleAlertAccept = () => {
   }
 };
 
+const documentNameRef = useRef(null);
+const descriptionRef = useRef(null);
+const urTextlRef = useRef(null);
   
   
 
@@ -403,6 +409,7 @@ const handleAlertAccept = () => {
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Nombre del documento:</Text>
         <TextInput
+          ref={documentNameRef}
           style={styles.input}
           placeholder="Nombre del documento"
           value={documentName}
@@ -432,6 +439,7 @@ const handleAlertAccept = () => {
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Comentario:</Text>
         <TextInput
+          ref={descriptionRef}
           style={styles.textArea}
           placeholder="Comentario"
           value={description}
@@ -445,6 +453,7 @@ const handleAlertAccept = () => {
         <Text style={styles.label}>Sitio web de consulta del documento:</Text>
         <View style={styles.urlContainer}>
               <TextInput
+              ref={urTextlRef}
               style={[styles.input, styles.urlInput]}
               placeholder="URL (Opcional)"
               value={url}
@@ -496,38 +505,29 @@ const handleAlertAccept = () => {
         </TouchableOpacity>
       </View>
 
-      <Modal
-        visible={isActionSheetVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setIsActionSheetVisible(false)}
-      >
-        <View style={styles.actionSheetContainer}>
-          <View style={styles.actionSheet}>
-            <TouchableOpacity
-              style={styles.closeButton}
-              onPress={() => setIsActionSheetVisible(false)}
-            >
-              <FontAwesomeIcon icon={faTimesCircle} size={24} color="#999" />
-            </TouchableOpacity>
-
-            <View style={styles.optionsContainer}>
-              <TouchableOpacity onPress={() => handleActionSheetPress('camera')}>
-                <FontAwesomeIcon icon={faCamera} size={40} color="#185abd" />
-                <Text style={styles.optionText}>Cámara</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleActionSheetPress('gallery')}>
-                <FontAwesomeIcon icon={faImages} size={40} color="#185abd" />
-                <Text style={styles.optionText}>Galería</Text>
-              </TouchableOpacity>
-              <TouchableOpacity onPress={() => handleActionSheetPress('files')}>
-                <FontAwesomeIcon icon={faFile} size={40} color="#185abd" />
-                <Text style={styles.optionText}>Archivos</Text>
-              </TouchableOpacity>
-            </View>
+      <Modal visible={isActionSheetVisible} transparent={true} animationType="slide">
+      <View style={styles.modalContainer}>
+        <View style={styles.actionSheet}>
+          <TouchableOpacity onPress={() => setIsActionSheetVisible(false)} style={styles.closeButton}>
+            <FontAwesomeIcon icon={faTimesCircle} size={24} color="#999" />
+          </TouchableOpacity>
+          <View style={styles.optionsContainer}>
+          <TouchableOpacity onPress={() => handleActionSheetPress('camera')}>
+          <FontAwesomeIcon icon={faCamera} size={40} color="#185abd" />
+          <Text style={styles.optionText}>Cámara</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleActionSheetPress('gallery')}>
+          <FontAwesomeIcon icon={faImages} size={40} color="#185abd" />
+          <Text style={styles.optionText}>Galería</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => handleActionSheetPress('files')}>
+          <FontAwesomeIcon icon={faFile} size={40} color="#185abd" />
+          <Text style={styles.optionText}>Archivos</Text>
+        </TouchableOpacity>
           </View>
         </View>
-      </Modal>
+      </View>
+    </Modal>     
       <Modal
       visible={isImageViewerVisible}
       transparent={true}
@@ -552,6 +552,11 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     backgroundColor: '#f5f5f5',
+  },
+  modalContainer: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   title: {
     fontSize: 28,
