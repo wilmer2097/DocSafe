@@ -1,20 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import AppNavigator from './components/AppNavigator';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 const App = () => {
-  const [initialRoute, setInitialRoute] = useState('Welcome'); // Asigna directamente la ruta inicial deseada.
+  const [initialRoute, setInitialRoute] = useState('Welcome');
 
   useEffect(() => {
-    // Realiza cualquier comprobación inicial aquí, si es necesario.
-    // Por ejemplo, verificar si el perfil del usuario ya está configurado.
+    // Aquí puedes hacer comprobaciones iniciales si lo requieres
   }, []);
 
   if (!initialRoute) {
-    // Puedes mostrar una pantalla de carga aquí mientras determinas la ruta inicial.
+    // Muestra pantalla de carga o spinner si es necesario
     return null;
   }
 
-  return <AppNavigator initialRoute={initialRoute} />;
+  return (
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <AppNavigator initialRoute={initialRoute} />
+    </GestureHandlerRootView>
+  );
 };
 
 export default App;
