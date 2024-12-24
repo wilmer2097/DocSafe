@@ -54,7 +54,9 @@ const DocumentDetail = () => {
   const [currentImageUri, setCurrentImageUri] = useState(0);
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
   const [editingFileIndex, setEditingFileIndex] = useState(null);
+  const [isPicking, setIsPicking] = useState(false);
 
+  
   const checkAndRequestPermission = async (permission) => {
     const result = await check(permission);
     switch (result) {
@@ -133,11 +135,13 @@ const DocumentDetail = () => {
   const urTextlRef = useRef(null);
 
   const abrirCamara = async () => {
-
+    if (isPicking) return;
+    setIsPicking(true);
+  
     documentNameRef.current?.blur();
     descriptionRef.current?.blur();
     urTextlRef.current?.blur();
-
+  
     try {
       const imagen = await ImageCropPicker.openCamera({
         cropping: true,
@@ -154,15 +158,19 @@ const DocumentDetail = () => {
       handleFileSelection(destinationPath);
     } catch (error) {
       console.error('Error capturando la imagen con la cámara:', error);
+    } finally {
+      setIsPicking(false);
     }
   };
-
+  
   const abrirGaleria = async () => {
-    
+    if (isPicking) return;
+    setIsPicking(true);
+  
     documentNameRef.current?.blur();
     descriptionRef.current?.blur();
     urTextlRef.current?.blur();
-    
+  
     try {
       const imagen = await ImageCropPicker.openPicker({
         cropping: true,
@@ -179,15 +187,19 @@ const DocumentDetail = () => {
       handleFileSelection(destinationPath);
     } catch (error) {
       console.error('Error seleccionando la imagen de la galería:', error);
+    } finally {
+      setIsPicking(false);
     }
   };
-
+  
   const abrirDocumentos = async () => {
-
+    if (isPicking) return;
+    setIsPicking(true);
+  
     documentNameRef.current?.blur();
     descriptionRef.current?.blur();
     urTextlRef.current?.blur();
-    
+  
     try {
       const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
       if (result && result[0]) {
@@ -195,16 +207,17 @@ const DocumentDetail = () => {
         const filePath = result[0].uri;
         const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
         await RNFS.copyFile(filePath, destinationPath);
-
+  
         handleFileSelection(destinationPath);
       }
     } catch (error) {
       if (!DocumentPicker.isCancel(error)) {
         console.error('Error al seleccionar el archivo:', error);
       }
+    } finally {
+      setIsPicking(false);
     }
   };
-
   const handleFileSelection = (newFilePath) => {
     let updatedFiles = [...documentFiles];
 
@@ -408,7 +421,7 @@ const DocumentDetail = () => {
   };
 
   const handleFilePress = (file, index) => {
-    const isImage = file.endsWith('.jpg') || file.endsWith('.jpeg') || file.endsWith('.png');
+    const isImage = /\.(jpg|jpeg|png)$/.test(file);
     if (isImage) {
       setCurrentImageUri(index);
       setIsImageViewerVisible(true);
@@ -618,14 +631,13 @@ const DocumentDetail = () => {
         <Text style={styles.saveButtonText}>Guardar</Text>
       </TouchableOpacity>
       <Modal visible={isImageViewerVisible} transparent={true} animationType="slide">
-      <CustomImageViewer
-      visible={isImageViewerVisible}
-      images={documentFiles.filter(Boolean).map(file => ({ uri: `file://${file}` }))}
-      initialIndex={currentImageUri}
-      onClose={() => setIsImageViewerVisible(false)}
-      documentName={name}
+    <CustomImageViewer
+        visible={isImageViewerVisible}
+        images={documentFiles.filter(file => /\.(jpg|jpeg|png)$/.test(file)).map(file => ({ uri: `file://${file}` }))}
+        initialIndex={currentImageUri}
+        onClose={() => setIsImageViewerVisible(false)}
+        documentName={name}
     />
-    
     </Modal>
     
       <Modal visible={isActionSheetVisible} transparent={true} animationType="slide">

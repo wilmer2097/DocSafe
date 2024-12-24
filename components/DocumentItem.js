@@ -17,11 +17,11 @@ const DocumentItem = ({ documentName }) => {
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [documentData, setDocumentData] = useState(null);
   const [images, setImages] = useState([]);
+  const [processedImages, setProcessedImages] = useState([]);
   const [fileType, setFileType] = useState(null);
   const [initialIndex, setInitialIndex] = useState(0);
   const [isExpired, setIsExpired] = useState(false);
 
-  // Estado para manejar la alerta personalizada
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
 
@@ -71,13 +71,13 @@ const DocumentItem = ({ documentName }) => {
         return 'application/pdf';
       case 'doc':
       case 'docx':
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'; 
+        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
       case 'xls':
       case 'xlsx':
-        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'; 
+        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
       case 'ppt':
       case 'pptx':
-        return 'application/vnd.ms-powerpoint'; 
+        return 'application/vnd.ms-powerpoint';
       case 'jpg':
       case 'jpeg':
         return 'image/jpeg';
@@ -85,12 +85,12 @@ const DocumentItem = ({ documentName }) => {
         return 'image/png';
       case 'mp3':
       case 'wav':
-        return 'audio/*'; 
+        return 'audio/*';
       case 'mp4':
       case 'mkv':
-        return 'video/*'; 
+        return 'video/*';
       default:
-        return '*/*'; 
+        return '*/*';
     }
   };
 
@@ -109,42 +109,50 @@ const DocumentItem = ({ documentName }) => {
   
           const currentDate = new Date();
           const expiryDate = new Date(document.expiryDate);
-  
           setIsExpired(expiryDate < currentDate);
   
-          // Reinicia las imágenes antes de agregar nuevas
           const imageUris = [];
-          
           for (const file of document.imagenes) {
             const filePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${file}`;
             const fileExists = await RNFS.exists(filePath);
-  
             if (fileExists) {
-              imageUris.push({ uri: `file://${filePath}` });
-            } else {
-              console.warn(`La imagen ${file} no existe en la ruta: ${filePath}`);
+              imageUris.push({
+                uri: `file://${filePath}`,
+                fileName: file,
+                type: getMimeType(`file://${filePath}`),
+                originalPath: filePath
+              });
             }
           }
+          
+          setImages(imageUris);
+          
+          const processedImageUris = imageUris.map(img => ({
+            uri: img.uri,
+            type: img.type,
+            title: img.fileName,
+            enablePanZoom: true,
+            dimensions: {
+              width: 0,
+              height: 0
+            }
+          }));
+          
+          setProcessedImages(processedImageUris);
   
           if (imageUris.length > 0) {
-            setImages(imageUris);
-            const mainFile = document.imagenes[0];
-            setFileType(getFileType(mainFile));
+            setFileType(getFileType(document.imagenes[0]));
           } else {
             console.warn('No se encontraron imágenes válidas para mostrar.');
             setFileType(getFileType('unknown.ext'));
           }
         }
-      } else {
-        console.warn(`No se encontró el archivo: ${filesJsonPath}`);
       }
     } catch (error) {
       console.error('Error loading document data:', error);
       showCustomAlert('Error', 'No se pudo cargar los datos del documento.');
     }
   };
-  
-  
 
   useFocusEffect(
     useCallback(() => {
@@ -155,7 +163,7 @@ const DocumentItem = ({ documentName }) => {
   const handleOpenDocument = async (index) => {
     if (documentData && documentData.url && (!documentData.imagenes || documentData.imagenes.length === 0)) {
       handleOpenURL();
-    } else if (fileType?.icon === faFileImage) {
+    } else if (fileType?.icon === faFileImage && processedImages.length > 0) {
       setInitialIndex(index);
       setIsImageViewerVisible(true);
     } else {
@@ -178,11 +186,9 @@ const DocumentItem = ({ documentName }) => {
   const handleOpenURL = async () => {
     if (documentData && documentData.url) {
       let url = documentData.url.trim();
-
       if (!/^https?:\/\//i.test(url)) {
         url = `https://${url}`;
       }
-
       try {
         await Linking.openURL(url);
       } catch (error) {
@@ -195,20 +201,18 @@ const DocumentItem = ({ documentName }) => {
 
   const handleShare = async () => {
     try {
-      const fileUris = documentData.imagenes.map((file) => `file://${RNFS.DocumentDirectoryPath}/DocSafe/${file}`);
+      const fileUris = images.map(img => img.uri);
 
       if (fileUris.length === 0) {
         showCustomAlert('Error', 'No hay archivos para compartir.');
         return;
       }
 
-      const mimeType = getMimeType(fileUris[0]) || '*/*';
-
       const shareOptions = {
         title: 'Compartir Documento',
         urls: fileUris,
         message: `Documento: ${documentName}`,
-        type: mimeType,
+        type: images[0]?.type || '*/*',
       };
 
       await Share.open(shareOptions);
@@ -243,9 +247,11 @@ const DocumentItem = ({ documentName }) => {
         <View style={styles.textContainer}>
           <Text style={styles.documentName} numberOfLines={1}>{documentName}</Text>
           {isExpired ? (
-            <Text style={styles.expiredText}>Documento expirado</Text> 
+            <Text style={styles.expiredText}>Documento expirado</Text>
           ) : (
-            <Text style={styles.documentDescription} numberOfLines={1}>{documentData?.descripcion}</Text>
+            <Text style={styles.documentDescription} numberOfLines={1}>
+              {documentData?.descripcion}
+            </Text>
           )}
         </View>
       </TouchableOpacity>
@@ -265,24 +271,26 @@ const DocumentItem = ({ documentName }) => {
             color={documentData?.url ? "#185abd" : "#a9a9a9"} 
           />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={handleShare}
-        >
-          <FontAwesomeIcon 
-            icon={faShareAlt} 
-            size={20} 
-            color="#185abd" 
-          />
+        <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+          <FontAwesomeIcon icon={faShareAlt} size={20} color="#185abd" />
         </TouchableOpacity>
       </View>
 
       <CustomImageViewer
         visible={isImageViewerVisible}
-        images={images}
+        images={processedImages}
         initialIndex={initialIndex}
         onClose={() => setIsImageViewerVisible(false)}
-        documentName={documentName} 
+        documentName={documentName}
+        enableZoom={true}
+        maxZoomScale={3}
+        enableSwipe={true}
+        enablePanZoom={true}
+        onImageLoad={(index, dimensions) => {
+          const updatedImages = [...processedImages];
+          updatedImages[index].dimensions = dimensions;
+          setProcessedImages(updatedImages);
+        }}
       />
 
       {showAlert && (
@@ -351,7 +359,7 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   expiredContainer: {
-    backgroundColor: '#ffcccc', 
+    backgroundColor: '#ffcccc',
   },
   expiredText: {
     fontSize: 14,

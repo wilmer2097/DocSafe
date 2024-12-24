@@ -67,6 +67,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   const [showAlert, setShowAlert] = useState(false);  // Estado para mostrar el CustomAlert
   const [alertConfig, setAlertConfig] = useState({});  // Configuración del mensaje
   const [editingFileIndex, setEditingFileIndex] = useState(null);
+  const [isPicking, setIsPicking] = useState(false);
 
   const requestPermission = async (type) => {
     if (Platform.OS === 'ios') {
@@ -151,7 +152,9 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   };
 
  // Abrir la cámara con funcionalidad de recorte
-const abrirCamara = async (tipo) => {
+ const abrirCamara = async (tipo) => {
+  if (isPicking) return;
+  setIsPicking(true);
 
   documentNameRef.current?.blur();
   descriptionRef.current?.blur();
@@ -165,7 +168,6 @@ const abrirCamara = async (tipo) => {
       compressImageQuality: 0.8,
     });
 
-    // Genera un nombre único basado en la fecha y hora actual para las fotos tomadas
     const nombreArchivoUnico = `camera_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
 
     if (tipo === 'principal') {
@@ -175,12 +177,16 @@ const abrirCamara = async (tipo) => {
     }
   } catch (error) {
     console.log('Error al capturar la imagen con la cámara', error);
+  } finally {
+    setIsPicking(false);
   }
 };
 
 // Abrir la galería
 const abrirGaleria = async (tipo) => {
-  
+  if (isPicking) return;
+  setIsPicking(true);
+
   documentNameRef.current?.blur();
   descriptionRef.current?.blur();
   urTextlRef.current?.blur();
@@ -193,7 +199,6 @@ const abrirGaleria = async (tipo) => {
       compressImageQuality: 0.8,
     });
 
-    // Preserva el nombre original del archivo para las imágenes de la galería
     const nombreArchivoOriginal = imagen.filename || `gallery_${new Date().toISOString().replace(/[:.]/g, '-')}.jpg`;
 
     if (tipo === 'principal') {
@@ -203,10 +208,14 @@ const abrirGaleria = async (tipo) => {
     }
   } catch (error) {
     console.log('Error al seleccionar la imagen de la galería', error);
+  } finally {
+    setIsPicking(false);
   }
 };
 // Abrir el selector de documentos
 const abrirSelectorDocumentos = async (tipo) => {
+  if (isPicking) return;
+  setIsPicking(true);
 
   documentNameRef.current?.blur();
   descriptionRef.current?.blur();
@@ -214,6 +223,7 @@ const abrirSelectorDocumentos = async (tipo) => {
 
   try {
     const resultado = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
+
     if (resultado && resultado[0]) {
       const archivo = resultado[0];
       if (tipo === 'principal') {
@@ -227,6 +237,8 @@ const abrirSelectorDocumentos = async (tipo) => {
       console.error("Error seleccionando archivo:", error);
       Alert.alert('Error', `No se pudo seleccionar el documento: ${error.message || error}`);
     }
+  } finally {
+    setIsPicking(false);
   }
 };
 

@@ -18,6 +18,7 @@ import WelcomeScreen from './WelcomeScreen';
 import ArchivedDocuments from './ArchivedDocuments';
 import LoginScreen from './LoginScreen';
 import ProfileScreen from './ProfileScreen';
+import TestScreen from './pruebaa';
 import DocumentDetail from './DocumentDetail';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
 import RestoreBackupScreen from './RestoreBackupScreen';
@@ -83,6 +84,13 @@ const CustomDrawerContent = (props) => {
           <View style={styles.iconAndText}>
             <FontAwesomeIcon icon={faQuestionCircle} size={20} color="#185abd" style={styles.menuIcon} />
             <Text style={styles.menuText}>Ayuda</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('TestScreen')}>
+          <View style={styles.iconAndText}>
+            <FontAwesomeIcon icon={faQuestionCircle} size={20} color="#185abd" style={styles.menuIcon} />
+            <Text style={styles.menuText}>TestScreen</Text>
           </View>
         </TouchableOpacity>
 
@@ -175,6 +183,15 @@ const DrawerNavigator = () => {
       <Drawer.Screen 
         name="Guía de Uso" 
         component={HelpScreen}
+        options={{
+          drawerIcon: ({ color, size }) => (
+            <FontAwesomeIcon icon={faQuestionCircle} color={color} size={size} />
+          ),
+        }}
+      />
+      <Drawer.Screen 
+        name="TestScreen" 
+        component={TestScreen}
         options={{
           drawerIcon: ({ color, size }) => (
             <FontAwesomeIcon icon={faQuestionCircle} color={color} size={size} />
