@@ -46,12 +46,35 @@ export default function SimpleModalImagePicker() {
     return true; // iOS no usa esta ruta
   };
 
-  // Opción 1: Abrir Cámara
-  const handleOpenCamera = async () => {
-    // Cierra el modal
-    setModalVisible(false);
+  // --- NUEVA LÓGICA: cerrar modal y luego abrir la cámara/galería/archivos con un pequeño delay ---
 
-    // Opciones para la cámara
+  const handleSelectCamera = () => {
+    // Cierra el modal primero
+    setModalVisible(false);
+    // Espera 200ms para asegurarte de que el modal se haya cerrado
+    setTimeout(() => {
+      openCamera();
+    }, 200);
+  };
+
+  const handleSelectGallery = () => {
+    setModalVisible(false);
+    setTimeout(() => {
+      openGallery();
+    }, 200);
+  };
+
+  const handleSelectFiles = () => {
+    setModalVisible(false);
+    setTimeout(() => {
+      openFiles();
+    }, 200);
+  };
+
+  // ------------------------------------------------------------------
+
+  // Opción 1: Abrir Cámara
+  const openCamera = async () => {
     const options = {
       mediaType: 'photo',
       maxWidth: 800,
@@ -59,7 +82,6 @@ export default function SimpleModalImagePicker() {
       quality: 0.8,
     };
 
-    // Llama a la cámara
     const result = await launchCamera(options);
     if (result.didCancel) {
       console.log('El usuario canceló la cámara');
@@ -69,16 +91,13 @@ export default function SimpleModalImagePicker() {
       return;
     }
 
-    // Si todo va bien, guardamos la imagen
     if (result.assets && result.assets.length > 0) {
       setSelectedImage(result.assets[0].uri);
     }
   };
 
   // Opción 2: Abrir Galería
-  const handleOpenGallery = async () => {
-    setModalVisible(false);
-
+  const openGallery = async () => {
     // Verifica/solicita permisos en Android
     const granted = await requestAndroidGalleryPermission();
     if (!granted) {
@@ -86,7 +105,6 @@ export default function SimpleModalImagePicker() {
       return;
     }
 
-    // Opciones para la galería
     const options = {
       mediaType: 'photo',
       maxWidth: 800,
@@ -94,7 +112,6 @@ export default function SimpleModalImagePicker() {
       quality: 0.8,
     };
 
-    // Llama a la galería
     const result = await launchImageLibrary(options);
     if (result.didCancel) {
       console.log('El usuario canceló la selección de la galería');
@@ -104,22 +121,18 @@ export default function SimpleModalImagePicker() {
       return;
     }
 
-    // Si todo va bien, guardamos la imagen
     if (result.assets && result.assets.length > 0) {
       setSelectedImage(result.assets[0].uri);
     }
   };
 
   // Opción 3: Abrir “Archivos”
-  const handleOpenFiles = async () => {
-    setModalVisible(false);
+  const openFiles = async () => {
     try {
       const result = await DocumentPicker.pick({
         type: [DocumentPicker.types.allFiles],
       });
       if (result && result[0]) {
-        // Aquí podrías chequear si el archivo es imagen (mime type, extensión, etc.)
-        // Para mostrar algo, asumiremos que puede ser imagen y usamos su 'uri'.
         setSelectedImage(result[0].uri);
       }
     } catch (error) {
@@ -156,17 +169,17 @@ export default function SimpleModalImagePicker() {
             <Text style={styles.modalTitle}>Seleccionar origen</Text>
 
             {/* Botón para Cámara */}
-            <TouchableOpacity style={styles.optionButton} onPress={handleOpenCamera}>
+            <TouchableOpacity style={styles.optionButton} onPress={handleSelectCamera}>
               <Text style={styles.optionText}>Cámara</Text>
             </TouchableOpacity>
 
             {/* Botón para Galería */}
-            <TouchableOpacity style={styles.optionButton} onPress={handleOpenGallery}>
+            <TouchableOpacity style={styles.optionButton} onPress={handleSelectGallery}>
               <Text style={styles.optionText}>Galería</Text>
             </TouchableOpacity>
 
             {/* Botón para Archivos */}
-            <TouchableOpacity style={styles.optionButton} onPress={handleOpenFiles}>
+            <TouchableOpacity style={styles.optionButton} onPress={handleSelectFiles}>
               <Text style={styles.optionText}>Archivos</Text>
             </TouchableOpacity>
 
