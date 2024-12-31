@@ -1,250 +1,113 @@
-// SimpleModalImagePicker.js
+// components/ZoomableImage.js
 import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  Button,
-  Image,
-  Modal,
-  TouchableOpacity,
-  StyleSheet,
-  Platform,
-  PermissionsAndroid
-} from 'react-native';
-import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import DocumentPicker from 'react-native-document-picker';
+import { Image, StyleSheet } from 'react-native';
+import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import Reanimated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSpring,
+  runOnJS,
+} from 'react-native-reanimated';
 
-export default function SimpleModalImagePicker() {
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedImage, setSelectedImage] = useState(null);
+const ZoomableImage = ({ uri, onZoomChange, width, height }) => {
+  const [isZoomed, setIsZoomed] = useState(false);
 
-  // Abre el modal con las 3 opciones
-  const handleOpenModal = () => {
-    setModalVisible(true);
-  };
+  // Valores compartidos para animaciones
+  const scale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
 
-  // Cierra el modal
-  const handleCloseModal = () => {
-    setModalVisible(false);
-  };
-
-  // Permiso de galería en Android (opcional, pero recomendado)
-  const requestAndroidGalleryPermission = async () => {
-    if (Platform.OS === 'android') {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-        {
-          title: 'Permiso de galería',
-          message: 'Se requiere acceder a tu galería para seleccionar una imagen.',
-          buttonNeutral: 'Pregúntame luego',
-          buttonNegative: 'Cancelar',
-          buttonPositive: 'OK',
-        },
-      );
-      return granted === PermissionsAndroid.RESULTS.GRANTED;
-    }
-    return true; // iOS no usa esta ruta
-  };
-
-  // --- NUEVA LÓGICA: cerrar modal y luego abrir la cámara/galería/archivos con un pequeño delay ---
-
-  const handleSelectCamera = () => {
-    // Cierra el modal primero
-    setModalVisible(false);
-    // Espera 200ms para asegurarte de que el modal se haya cerrado
-    setTimeout(() => {
-      openCamera();
-    }, 200);
-  };
-
-  const handleSelectGallery = () => {
-    setModalVisible(false);
-    setTimeout(() => {
-      openGallery();
-    }, 200);
-  };
-
-  const handleSelectFiles = () => {
-    setModalVisible(false);
-    setTimeout(() => {
-      openFiles();
-    }, 200);
-  };
-
-  // ------------------------------------------------------------------
-
-  // Opción 1: Abrir Cámara
-  const openCamera = async () => {
-    const options = {
-      mediaType: 'photo',
-      maxWidth: 800,
-      maxHeight: 800,
-      quality: 0.8,
-    };
-
-    const result = await launchCamera(options);
-    if (result.didCancel) {
-      console.log('El usuario canceló la cámara');
-      return;
-    } else if (result.errorCode) {
-      console.log('Error al usar la cámara:', result.errorMessage);
-      return;
-    }
-
-    if (result.assets && result.assets.length > 0) {
-      setSelectedImage(result.assets[0].uri);
-    }
-  };
-
-  // Opción 2: Abrir Galería
-  const openGallery = async () => {
-    // Verifica/solicita permisos en Android
-    const granted = await requestAndroidGalleryPermission();
-    if (!granted) {
-      console.log('Permiso de galería denegado');
-      return;
-    }
-
-    const options = {
-      mediaType: 'photo',
-      maxWidth: 800,
-      maxHeight: 800,
-      quality: 0.8,
-    };
-
-    const result = await launchImageLibrary(options);
-    if (result.didCancel) {
-      console.log('El usuario canceló la selección de la galería');
-      return;
-    } else if (result.errorCode) {
-      console.log('Error al abrir galería:', result.errorMessage);
-      return;
-    }
-
-    if (result.assets && result.assets.length > 0) {
-      setSelectedImage(result.assets[0].uri);
-    }
-  };
-
-  // Opción 3: Abrir “Archivos”
-  const openFiles = async () => {
-    try {
-      const result = await DocumentPicker.pick({
-        type: [DocumentPicker.types.allFiles],
-      });
-      if (result && result[0]) {
-        setSelectedImage(result[0].uri);
-      }
-    } catch (error) {
-      if (DocumentPicker.isCancel(error)) {
-        console.log('Usuario canceló la selección de archivos');
+  // Gesto de Doble Tap para alternar zoom
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      if (scale.value > 1) {
+        scale.value = withSpring(1);
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        runOnJS(setIsZoomed)(false);
+        runOnJS(onZoomChange)(false);
       } else {
-        console.log('Error al seleccionar archivo:', error);
+        scale.value = withSpring(2);
+        runOnJS(setIsZoomed)(true);
+        runOnJS(onZoomChange)(true);
       }
-    }
-  };
+    });
+
+  // Gesto de Pinch para zoom in/out
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((event) => {
+      scale.value = event.scale;
+      if (event.scale > 1 && !isZoomed) {
+        runOnJS(setIsZoomed)(true);
+        runOnJS(onZoomChange)(true);
+      }
+    })
+    .onEnd(() => {
+      if (scale.value <= 1) {
+        scale.value = withSpring(1);
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        runOnJS(setIsZoomed)(false);
+        runOnJS(onZoomChange)(false);
+      }
+    });
+
+  // Gesto de Pan para mover la imagen cuando está en zoom
+  const panGesture = Gesture.Pan()
+    .onUpdate((event) => {
+      if (scale.value > 1) {
+        translateX.value = event.translationX;
+        translateY.value = event.translationY;
+      }
+    })
+    .onEnd(() => {
+      if (scale.value <= 1) {
+        translateX.value = withSpring(0);
+        translateY.value = withSpring(0);
+        runOnJS(setIsZoomed)(false);
+        runOnJS(onZoomChange)(false);
+      }
+    });
+
+  // Combinar gestos de Pinch, Pan y Doble Tap simultáneamente
+  const composedGesture = Gesture.Simultaneous(
+    pinchGesture,
+    panGesture,
+    doubleTapGesture
+  );
+
+  // Estilo animado basado en los valores compartidos
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { scale: scale.value },
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+    ],
+  }));
 
   return (
-    <View style={styles.container}>
-      <Button title="Seleccionar imagen" onPress={handleOpenModal} />
-
-      {/* Vista previa de la imagen */}
-      {selectedImage && (
+    <GestureDetector gesture={composedGesture}>
+      <Reanimated.View style={[styles.imageContainer, { width, height }, animatedStyle]}>
         <Image
-          source={{ uri: selectedImage }}
-          style={styles.previewImage}
+          source={{ uri }}
+          style={[styles.image, { width, height }]}
           resizeMode="contain"
         />
-      )}
-
-      {/* Modal con las 3 opciones */}
-      <Modal
-        visible={modalVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={handleCloseModal}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Seleccionar origen</Text>
-
-            {/* Botón para Cámara */}
-            <TouchableOpacity style={styles.optionButton} onPress={handleSelectCamera}>
-              <Text style={styles.optionText}>Cámara</Text>
-            </TouchableOpacity>
-
-            {/* Botón para Galería */}
-            <TouchableOpacity style={styles.optionButton} onPress={handleSelectGallery}>
-              <Text style={styles.optionText}>Galería</Text>
-            </TouchableOpacity>
-
-            {/* Botón para Archivos */}
-            <TouchableOpacity style={styles.optionButton} onPress={handleSelectFiles}>
-              <Text style={styles.optionText}>Archivos</Text>
-            </TouchableOpacity>
-
-            {/* Botón para Cancelar */}
-            <TouchableOpacity style={styles.cancelButton} onPress={handleCloseModal}>
-              <Text style={styles.cancelText}>Cancelar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-    </View>
+      </Reanimated.View>
+    </GestureDetector>
   );
-}
+};
 
-// Estilos básicos
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingTop: 80,
+  imageContainer: {
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: 'black', // Para depuración
   },
-  previewImage: {
-    width: 200,
-    height: 200,
-    marginTop: 20,
-    borderRadius: 8,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)', // Semitransparencia
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    padding: 20,
-    borderTopRightRadius: 20,
-    borderTopLeftRadius: 20,
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 12,
-    textAlign: 'center',
-  },
-  optionButton: {
-    backgroundColor: '#185abd',
-    padding: 12,
-    borderRadius: 6,
-    marginBottom: 10,
-  },
-  optionText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 16,
-  },
-  cancelButton: {
-    backgroundColor: '#999',
-    padding: 12,
-    borderRadius: 6,
-    marginTop: 10,
-  },
-  cancelText: {
-    color: '#fff',
-    textAlign: 'center',
-    fontSize: 16,
+  image: {
+    // Las dimensiones se pasan como props
   },
 });
+
+export default ZoomableImage;

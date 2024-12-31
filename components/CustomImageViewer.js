@@ -1,70 +1,111 @@
+// CustomImageViewer.js
 import React, { useState, useEffect, useCallback } from 'react';
-import { StyleSheet, Modal, FlatList, TouchableOpacity, Alert, useWindowDimensions } from 'react-native';
+import {
+  StyleSheet,
+  Modal,
+  FlatList,
+  TouchableOpacity,
+  Alert,
+  useWindowDimensions,
+} from 'react-native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faTimes, faShareAlt } from '@fortawesome/free-solid-svg-icons';
 import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
-import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
-import Animated, { 
-  useSharedValue, 
-  useAnimatedStyle, 
-  withSpring, 
+
+import {
+  GestureHandlerRootView,
+  GestureDetector,
+  Gesture,
+} from 'react-native-gesture-handler';
+
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
   withTiming,
   runOnJS,
   useAnimatedRef,
   Easing,
-  useAnimatedScrollHandler
+  useAnimatedScrollHandler,
 } from 'react-native-reanimated';
 
-interface CustomImageViewerProps {
-  visible: boolean;
-  images: { uri: string }[];
-  initialIndex?: number;
-  onClose: () => void;
-  documentName: string;
-}
-
-const CustomImageViewer: React.FC<CustomImageViewerProps> = ({ 
-  visible, 
-  images, 
-  initialIndex = 0, 
-  onClose, 
-  documentName 
-}) => {
+export default function CustomImageViewer({
+  visible,
+  images,
+  initialIndex = 0,
+  onClose,
+  documentName,
+}) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [documentData, setDocumentData] = useState<any>(null);
-  const flatListRef = useAnimatedRef<FlatList>();
-  const { width, height } = useWindowDimensions();
+  const [canScroll, setCanScroll] = useState(true); // Permitir swipe horizontal
+  const [documentData, setDocumentData] = useState(null);
 
+  // Animación para fade in/out
   const fadeAnim = useSharedValue(0);
+
+  // Zoom/Pan
   const scale = useSharedValue(1);
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
-  const scrollEnabled = useSharedValue(true);
 
-  const resetValues = useCallback(() => {
-    'worklet';
-    scale.value = 1;
-    translateX.value = 0;
-    translateY.value = 0;
-    scrollEnabled.value = true;
-  }, []);
+  // Ref a la FlatList
+  const flatListRef = useAnimatedRef();
 
+  // Dimensiones de ventana
+  const { width, height } = useWindowDimensions();
+
+  // Efecto al mostrar/ocultar
   useEffect(() => {
     if (visible) {
       fadeAnim.value = withTiming(1, { duration: 300, easing: Easing.ease });
-      loadDocumentData();
+      loadDocumentData(); // si lo necesitas
     } else {
       setCurrentIndex(initialIndex);
     }
-  }, [visible, initialIndex, fadeAnim]);
+  }, [visible, initialIndex]);
 
+  // Carga doc (si lo necesitas para compartir)
+  const loadDocumentData = async () => {
+    try {
+      const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
+      const filesDataExists = await RNFS.exists(filesJsonPath);
+
+      if (filesDataExists) {
+        const filesData = await RNFS.readFile(filesJsonPath);
+        const parsedFilesData = JSON.parse(filesData);
+        const doc = parsedFilesData.archivos.find(
+          (d) => d.nombre === documentName
+        );
+        if (doc) {
+          console.log('[CustomImageViewer] Document data found:', doc.nombre);
+          setDocumentData(doc);
+        } else {
+          console.log('[CustomImageViewer] No doc found with nombre=', documentName);
+        }
+      }
+    } catch (error) {
+      console.error('[CustomImageViewer] Error loading doc data:', error);
+    }
+  };
+
+  // Reset de zoom/pan
+  const resetValues = useCallback(() => {
+    'worklet';
+    console.log('[resetValues] → scale=1, translating=0');
+    scale.value = 1;
+    translateX.value = 0;
+    translateY.value = 0;
+    runOnJS(setCanScroll)(true);
+  }, []);
+
+  // Gestos
   const pinchGesture = Gesture.Pinch()
     .onUpdate((event) => {
       'worklet';
       scale.value = event.scale;
       if (event.scale > 1) {
-        scrollEnabled.value = false;
+        runOnJS(setCanScroll)(false);
       }
     })
     .onEnd(() => {
@@ -98,10 +139,18 @@ const CustomImageViewer: React.FC<CustomImageViewerProps> = ({
         resetValues();
       } else {
         scale.value = withSpring(2);
-        scrollEnabled.value = false;
+        runOnJS(setCanScroll)(false);
       }
     });
 
+  // Combinar gestos
+  const composedGesture = Gesture.Simultaneous(
+    doubleTapGesture,
+    pinchGesture,
+    panGesture
+  );
+
+  // Estilo animado de la imagen
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [
       { scale: scale.value },
@@ -110,58 +159,48 @@ const CustomImageViewer: React.FC<CustomImageViewerProps> = ({
     ],
   }));
 
+  // Fade in/out container
   const fadeStyle = useAnimatedStyle(() => ({
     opacity: fadeAnim.value,
   }));
 
+  // Manejo de scroll horizontal
   const scrollHandler = useAnimatedScrollHandler({
     onMomentumEnd: (event) => {
-      const newIndex = Math.round(event.contentOffset.x / width);
+      const offsetX = event.contentOffset.x;
+      const newIndex = Math.round(offsetX / width);
+      console.log(
+        '[scrollHandler] onMomentumEnd offsetX=',
+        offsetX,
+        ' newIndex=',
+        newIndex
+      );
       runOnJS(setCurrentIndex)(newIndex);
-      resetValues();
+      runOnJS(resetValues)();
     },
   });
 
-  const loadDocumentData = async () => {
-    try {
-      const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
-      const filesDataExists = await RNFS.exists(filesJsonPath);
-
-      if (filesDataExists) {
-        const filesData = await RNFS.readFile(filesJsonPath);
-        const parsedFilesData = JSON.parse(filesData);
-        const document = parsedFilesData.archivos.find((doc: any) => doc.nombre === documentName);
-
-        if (document) {
-          setDocumentData(document);
-        }
-      }
-    } catch (error) {
-      console.error('Error loading document data:', error);
-    }
-  };
-
+  // Función cerrar
   const handleClose = () => {
+    console.log('[handleClose] → anim fade out');
     fadeAnim.value = withTiming(0, { duration: 300, easing: Easing.ease }, () => {
       runOnJS(onClose)();
     });
   };
 
+  // Compartir la imagen actual
   const handleShare = async () => {
     try {
       if (!documentData || !documentData.imagenes || documentData.imagenes.length === 0) {
         Alert.alert('Error', 'No hay imágenes disponibles para compartir.');
         return;
       }
-
       const fileName = documentData.imagenes[currentIndex];
       const fileUri = `file://${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
-
       if (!fileUri) {
         Alert.alert('Error', 'No hay archivo disponible para compartir.');
         return;
       }
-
       const mimeType = getMimeType(fileUri) || '*/*';
 
       const shareOptions = {
@@ -173,11 +212,11 @@ const CustomImageViewer: React.FC<CustomImageViewerProps> = ({
 
       await Share.open(shareOptions);
     } catch (error) {
-      console.error('Error al compartir la imagen:', error);
+      console.error('[CustomImageViewer] Error al compartir:', error);
     }
   };
 
-  const getMimeType = (fileUri: string) => {
+  const getMimeType = (fileUri) => {
     const extension = fileUri.split('.').pop()?.toLowerCase();
     switch (extension) {
       case 'pdf':
@@ -192,24 +231,31 @@ const CustomImageViewer: React.FC<CustomImageViewerProps> = ({
     }
   };
 
-  const renderImage = useCallback(({ item }: { item: { uri: string } }) => (
-    <GestureHandlerRootView>
-      <GestureDetector gesture={Gesture.Simultaneous(doubleTapGesture, Gesture.Race(pinchGesture, panGesture))}>
-        <Animated.View style={[styles.imageContainer, { width, height }]}>
-          <Animated.Image
-            source={{ uri: item.uri }}
-            style={[styles.image, { width, height }, animatedStyle]}
-            resizeMode="contain"
-          />
-        </Animated.View>
-      </GestureDetector>
-    </GestureHandlerRootView>
-  ), [width, height, animatedStyle, doubleTapGesture, pinchGesture, panGesture]);
+  // Renderiza cada página
+  const renderImage = useCallback(
+    ({ item, index }) => {
+      console.log('[renderImage] index=', index, ' uri=', item.uri);
+      return (
+        <GestureHandlerRootView style={{ width, height }}>
+          <GestureDetector gesture={composedGesture}>
+            <Animated.View style={styles.imageContainer}>
+              <Animated.Image
+                source={{ uri: item.uri }}
+                style={[styles.image, { width, height }, animatedStyle]}
+                resizeMode="contain"
+              />
+            </Animated.View>
+          </GestureDetector>
+        </GestureHandlerRootView>
+      );
+    },
+    [width, height, animatedStyle, composedGesture]
+  );
 
   return (
     <Modal
       visible={visible}
-      transparent={true}
+      transparent
       animationType="none"
       onRequestClose={handleClose}
     >
@@ -218,28 +264,35 @@ const CustomImageViewer: React.FC<CustomImageViewerProps> = ({
           ref={flatListRef}
           data={images}
           renderItem={renderImage}
-          keyExtractor={(item, index) => `${item.uri}-${index}`}
+          keyExtractor={(item, i) => `${item.uri}-${i}`}
           horizontal
           pagingEnabled
           showsHorizontalScrollIndicator={false}
           initialScrollIndex={currentIndex}
           onScroll={scrollHandler}
           scrollEventThrottle={16}
-          getItemLayout={(_, index) => (
-            { length: width, offset: width * index, index }
-          )}
-          scrollEnabled={scrollEnabled}
+          // Forzamos que cada ítem sea width px para que pagingEnabled funcione
+          getItemLayout={(_, i) => ({
+            length: width,
+            offset: width * i,
+            index: i,
+          })}
+          scrollEnabled={canScroll}
         />
+
+        {/* Botón Cerrar */}
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
           <FontAwesomeIcon icon={faTimes} size={24} color="#ffffff" />
         </TouchableOpacity>
+
+        {/* Botón Compartir */}
         <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
           <FontAwesomeIcon icon={faShareAlt} size={24} color="#ffffff" />
         </TouchableOpacity>
       </Animated.View>
     </Modal>
   );
-};
+}
 
 const styles = StyleSheet.create({
   modalContainer: {
@@ -249,6 +302,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   imageContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -272,6 +326,3 @@ const styles = StyleSheet.create({
     borderRadius: 25,
   },
 });
-
-export default CustomImageViewer;
-
