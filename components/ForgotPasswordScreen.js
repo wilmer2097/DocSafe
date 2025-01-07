@@ -24,13 +24,14 @@ const ForgotPasswordScreen = ({ navigation }) => {
       const userProfile = JSON.parse(profileData).perfilUsuario;
 
       // Validar si el correo ingresado coincide con el perfil almacenado
-      if (userProfile.correo === email) {
+      if (userProfile.correo === email.toLowerCase()) {
         // Mostrar el token asociado al correo
         showCustomAlert('Token ID Encontrado', 'Tu token es:', userProfile.loginCode, true);
       } else {
         // Mostrar error si el correo no coincide
         showCustomAlert('Error', 'Correo electrónico no encontrado.');
       }
+      
     } catch (error) {
       console.error('Error:', error);
       showCustomAlert('Error', 'Ocurrió un problema al procesar la solicitud.');
@@ -51,7 +52,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         style={styles.input}
         placeholder="Correo electrónico"
         value={email}
-        onChangeText={(text) => setEmail(text.toLowerCase())}
+        onChangeText={(text) => setEmail(text)}
         keyboardType="email-address"
         placeholderTextColor="#999"
       />

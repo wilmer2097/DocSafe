@@ -195,6 +195,8 @@ const ProfileScreen = ({ navigation }) => {
       return;
     }
 
+    profile.correo = profile.correo.toLowerCase();
+
     if (!validateEmail(profile.correo)) {
       showCustomAlert('Error', 'Por favor ingresa un correo electrónico válido.');
       setIsSubmitting(false);
@@ -274,8 +276,10 @@ const ProfileScreen = ({ navigation }) => {
   };
 
   const handleChange = (key, value) => {
-    setProfile(prev => ({ ...prev, [key]: value }));
+    setProfile(prev => ({ ...prev, [key]: value.toLowerCase() }));
   };
+  
+  
 
   const validateEmail = (email) => {
     return /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(email);
@@ -332,15 +336,16 @@ const ProfileScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.inputContainer}>
-          <Text style={styles.label}>Correo</Text>
-          <TextInput
-          style={styles.input}
-          placeholder="Correo"
-          value={profile.correo}
-          onChangeText={(text) => handleChange('correo', text.toLowerCase())}
-          keyboardType="email-address"
-        />
-        </View>
+        <Text style={styles.label}>Correo</Text>
+        <TextInput
+        style={styles.input}
+        placeholder="Correo electrónico"
+        value={email}
+        onChangeText={(text) => setEmail(text)}
+        keyboardType="email-address"
+        placeholderTextColor="#999"
+      />
+      </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Teléfono</Text>
