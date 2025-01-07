@@ -1,17 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, FlatList, ActivityIndicator } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
 import RNFS from 'react-native-fs';
 import { zip, unzip } from 'react-native-zip-archive';
 import Share from 'react-native-share';
 import DocumentPicker from 'react-native-document-picker';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faFileExport, faFileImport, faShareAlt, faUndo, faMousePointer } from '@fortawesome/free-solid-svg-icons';
-import CustomAlert from './CustomAlert'; // Importa tu componente de alerta personalizada
+import CustomAlert from './CustomAlert'; // Tu componente de alerta personalizada
 
 const RestoreBackupScreen = () => {
-  const [backupFile, setBackupFile] = useState(null);
+  // Mantendremos dos estados distintos:
+  // 1) backupCreated (último backup creado)
+  // 2) backupLoaded (último backup cargado)
+  const [backupCreated, setBackupCreated] = useState(null);
+  const [backupLoaded, setBackupLoaded] = useState(null);
+
   const [loading, setLoading] = useState(false);
-  const [lastAction, setLastAction] = useState(''); // Estado para almacenar la última acción
 
   // Estados para la alerta personalizada
   const [alertVisible, setAlertVisible] = useState(false);
@@ -23,27 +27,43 @@ const RestoreBackupScreen = () => {
     setAlertVisible(true);
   };
 
+  // Rutas base
   const backupFolder = `${RNFS.DocumentDirectoryPath}/DocSafeBackups`;
-  const backupFilePath = `${backupFolder}/backup_docsafe.zip`;
+  const backupFilePath = `${backupFolder}/backup_docsafe.zip`; // Al crear backups
   const docsPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
   const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
   const archivosDataPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
 
+  // ---------------------------------------------------
+  // 1. CREAR BACKUP
+  // ---------------------------------------------------
   const createBackup = async () => {
     setLoading(true);
     try {
+      // Asegurar carpeta DocSafeBackups
       const folderExists = await RNFS.exists(backupFolder);
       if (!folderExists) {
         await RNFS.mkdir(backupFolder);
       }
 
+      // Si existe un backup previo con el mismo nombre, se elimina
+      const fileExists = await RNFS.exists(backupFilePath);
+      if (fileExists) {
+        await RNFS.unlink(backupFilePath);
+      }
+
+      // Zipear archivos
       const filesToZip = [docsPath, profilePath, archivosDataPath];
       const resultPath = await zip(filesToZip, backupFilePath);
 
       const backupDate = new Date().toLocaleDateString();
-      setBackupFile({ path: resultPath, name: `Backup - ${backupDate}.zip` });
+      // Guardamos en el estado de backup creado
+      setBackupCreated({
+        path: resultPath,
+        name: `Backup - ${backupDate}.zip`,
+      });
 
-      setLastAction('create'); // Actualizar la última acción
+      // Mostramos alerta de éxito
       showCustomAlert('Éxito', 'Backup creado correctamente.');
     } catch (error) {
       console.error('Error al crear el backup:', error);
@@ -53,18 +73,47 @@ const RestoreBackupScreen = () => {
     }
   };
 
+  // ---------------------------------------------------
+  // 2. CARGAR BACKUP (desde DocumentPicker)
+  // ---------------------------------------------------
   const loadBackup = async () => {
     setLoading(true);
     try {
       const result = await DocumentPicker.pick({ type: [DocumentPicker.types.zip] });
       if (result && result[0]) {
-        const backupZipPath = result[0].uri;
+        // URI devuelta por DocumentPicker
+        const pickedZipUri = result[0].uri;
+
+        // Verificar carpeta DocSafeBackups
+        const folderExists = await RNFS.exists(backupFolder);
+        if (!folderExists) {
+          await RNFS.mkdir(backupFolder);
+        }
+
+        // Ruta local donde guardaremos el ZIP cargado
+        const localZipPath = `${backupFolder}/backup_docsafe.zip`;
+
+        // Si ya existe un ZIP con este nombre, lo borramos para sobrescribir
+        const fileExists = await RNFS.exists(localZipPath);
+        if (fileExists) {
+          await RNFS.unlink(localZipPath);
+        }
+
+        // Copiar el archivo seleccionado a la carpeta interna
+        const sourcePath = pickedZipUri.replace('file://', '');
+        await RNFS.copyFile(sourcePath, localZipPath);
+
+        // ------------ Ejemplo de restauración inmediata -------------
+        //     (descomprimir y mover .json a /assets)
+        // Nota: Esto lo hacemos para demostrar que se cargó correctamente.
+        // Si prefieres restaurar solo con el botón "faUndo", puedes
+        // comentar la sección de descompresión.
         const tempZipPath = `${RNFS.TemporaryDirectoryPath}/backup_temp.zip`;
+        await RNFS.copyFile(localZipPath, tempZipPath);
 
-        await RNFS.copyFile(backupZipPath, tempZipPath);
         const unzipPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
-
         console.log('Extrayendo el archivo ZIP en:', unzipPath);
+
         await unzip(tempZipPath, unzipPath);
         await RNFS.unlink(tempZipPath);
 
@@ -78,17 +127,28 @@ const RestoreBackupScreen = () => {
 
         for (const file of extractedFiles) {
           if (file.name.endsWith('.json')) {
-            const sourcePath = `${unzipPath}/${file.name}`;
-            const destinationPath = `${assetsPath}/${file.name}`;
-            await RNFS.moveFile(sourcePath, destinationPath);
+            const jsonSource = `${unzipPath}/${file.name}`;
+            const jsonDestination = `${assetsPath}/${file.name}`;
+
+            const jsonExists = await RNFS.exists(jsonDestination);
+            if (jsonExists) {
+              await RNFS.unlink(jsonDestination);
+            }
+
+            await RNFS.moveFile(jsonSource, jsonDestination);
             console.log(`Archivo JSON movido a assets: ${file.name}`);
           } else {
             console.log(`Archivo multimedia mantenido en DocSafe: ${file.name}`);
           }
         }
+        // -------------------------------------------------------------
 
-        setLastAction('load'); // Actualizar la última acción
-        setBackupFile({ path: backupZipPath, name: `Backup Cargado - ${new Date().toLocaleDateString()}.zip` });
+        // Guardamos en el estado de backup cargado
+        setBackupLoaded({
+          path: localZipPath,
+          name: `Backup Cargado - ${new Date().toLocaleDateString()}.zip`,
+        });
+
         showCustomAlert('Éxito', 'Backup restaurado correctamente.');
       }
     } catch (error) {
@@ -99,11 +159,76 @@ const RestoreBackupScreen = () => {
     }
   };
 
-  const handleShare = async () => {
+  // ---------------------------------------------------
+  // 3. RESTAURAR BACKUP (ya sea creado o cargado)
+  // ---------------------------------------------------
+  const restoreBackup = async (backup) => {
+    if (!backup?.path) {
+      showCustomAlert('Error', 'No hay ningún backup para restaurar.');
+      return;
+    }
+    setLoading(true);
+
+    try {
+      const backupZipPath = backup.path;
+      const tempZipPath = `${RNFS.TemporaryDirectoryPath}/backup_temp.zip`;
+
+      // Copiamos el .zip a una ruta temporal
+      await RNFS.copyFile(backupZipPath, tempZipPath);
+
+      const unzipPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
+      console.log('Extrayendo el archivo ZIP en:', unzipPath);
+
+      await unzip(tempZipPath, unzipPath);
+      await RNFS.unlink(tempZipPath);
+
+      // Mover JSON a /assets (si existen)
+      const extractedFiles = await RNFS.readDir(unzipPath);
+      const assetsPath = `${RNFS.DocumentDirectoryPath}/assets`;
+
+      const assetsExists = await RNFS.exists(assetsPath);
+      if (!assetsExists) {
+        await RNFS.mkdir(assetsPath);
+      }
+
+      for (const file of extractedFiles) {
+        if (file.name.endsWith('.json')) {
+          const sourcePath = `${unzipPath}/${file.name}`;
+          const destinationPath = `${assetsPath}/${file.name}`;
+
+          const fileExists = await RNFS.exists(destinationPath);
+          if (fileExists) {
+            await RNFS.unlink(destinationPath);
+          }
+
+          await RNFS.moveFile(sourcePath, destinationPath);
+          console.log(`Archivo JSON movido a assets: ${file.name}`);
+        } else {
+          console.log(`Archivo multimedia mantenido en DocSafe: ${file.name}`);
+        }
+      }
+
+      showCustomAlert('Éxito', 'Backup restaurado correctamente.');
+    } catch (error) {
+      console.error('Error al restaurar el backup:', error);
+      showCustomAlert('Error', 'No se pudo restaurar el backup.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ---------------------------------------------------
+  // 4. COMPARTIR BACKUP (generalmente el creado)
+  // ---------------------------------------------------
+  const shareBackup = async (backup) => {
+    if (!backup?.path) {
+      showCustomAlert('Error', 'No hay ningún backup para compartir.');
+      return;
+    }
     try {
       const shareOptions = {
         title: 'Compartir Backup',
-        url: `file://${backupFilePath}`,
+        url: `file://${backup.path}`, // Importante anteponer file://
         type: 'application/zip',
       };
       await Share.open(shareOptions);
@@ -113,14 +238,27 @@ const RestoreBackupScreen = () => {
     }
   };
 
-  const renderBackupItem = () => (
+  // ---------------------------------------------------
+  // Renderizado genérico de un backup con sus botones
+  // ---------------------------------------------------
+  const renderBackupItem = (backup, label) => (
     <View style={styles.backupItem}>
-      <Text style={styles.backupName}>{backupFile.name}</Text>
+      <Text style={styles.backupName}>
+        {label}: {backup?.name || ''}
+      </Text>
       <View style={styles.buttonGroup}>
-        <TouchableOpacity style={[styles.iconButton, styles.shareButton]} onPress={handleShare}>
+        {/* Botón para compartir */}
+        <TouchableOpacity
+          style={[styles.iconButton, styles.shareButton]}
+          onPress={() => shareBackup(backup)}
+        >
           <FontAwesomeIcon icon={faShareAlt} size={20} color="#ffffff" />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.iconButton, styles.restoreButton]} onPress={loadBackup}>
+        {/* Botón para restaurar */}
+        <TouchableOpacity
+          style={[styles.iconButton, styles.restoreButton]}
+          onPress={() => restoreBackup(backup)}
+        >
           <FontAwesomeIcon icon={faUndo} size={20} color="#ffffff" />
         </TouchableOpacity>
       </View>
@@ -132,19 +270,29 @@ const RestoreBackupScreen = () => {
       {loading && <ActivityIndicator size="large" color="#185abd" />}
 
       <View style={styles.buttonContainer}>
-        <TouchableOpacity style={[styles.actionButton, styles.exportButton]} onPress={createBackup}>
+        {/* 1) Botón Crear Backup */}
+        <TouchableOpacity
+          style={[styles.actionButton, styles.exportButton]}
+          onPress={createBackup}
+        >
           <FontAwesomeIcon icon={faFileExport} size={20} color="#ffffff" />
           <Text style={styles.buttonText}>Crear Backup</Text>
         </TouchableOpacity>
 
-        {lastAction === 'create' && backupFile && renderBackupItem()}
+        {/* Si ya se creó un backup, mostrarlo debajo */}
+        {backupCreated && renderBackupItem(backupCreated, 'Backup Creado')}
 
-        <TouchableOpacity style={[styles.actionButton, styles.importButton]} onPress={loadBackup}>
+        {/* 2) Botón Cargar Backup */}
+        <TouchableOpacity
+          style={[styles.actionButton, styles.importButton]}
+          onPress={loadBackup}
+        >
           <FontAwesomeIcon icon={faFileImport} size={20} color="#ffffff" />
           <Text style={styles.buttonText}>Cargar Backup</Text>
         </TouchableOpacity>
 
-        {lastAction === 'load' && backupFile && renderBackupItem()}
+        {/* Si ya se cargó un backup, mostrarlo debajo */}
+        {backupLoaded && renderBackupItem(backupLoaded, 'Backup Cargado')}
       </View>
 
       {/* Componente de alerta personalizada */}
@@ -156,21 +304,31 @@ const RestoreBackupScreen = () => {
         onAccept={() => setAlertVisible(false)}
       />
 
+      {/* Banner inferior */}
       <TouchableOpacity
         style={styles.bottomBanner}
         onPress={() => Linking.openURL('https://solucionestecperu.com/idea.html')}
       >
         <View style={styles.bottomBannerContent}>
-          <Text style={styles.bottomBannerText}>Tienes una idea, tienes un software </Text>
-          <FontAwesomeIcon icon={faMousePointer} size={20} color="#fff" style={styles.bottomBannerIcon} />
+          <Text style={styles.bottomBannerText}>
+            Tienes una idea, tienes un software{' '}
+          </Text>
+          <FontAwesomeIcon
+            icon={faMousePointer}
+            size={20}
+            color="#fff"
+            style={styles.bottomBannerIcon}
+          />
         </View>
       </TouchableOpacity>
     </View>
   );
 };
 
+// ---------------------------------------------------
+// Estilos
+// ---------------------------------------------------
 const styles = StyleSheet.create({
-  // Tus estilos permanecen iguales
   container: {
     flex: 1,
     padding: 20,
@@ -193,21 +351,23 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  title: {
-    fontSize: 26,
-    fontWeight: 'bold',
-    color: '#185abd',
-    marginBottom: 20,
+  bottomBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  bottomBannerIcon: {
+    marginLeft: 10,
   },
   buttonContainer: {
     flexDirection: 'column',
-    justifyContent: 'flex-start', 
-    alignItems: 'center', 
-    width: '100%', 
-    gap: 30, 
-    paddingHorizontal: 10, 
-    marginBottom: 70, 
-  },  
+    justifyContent: 'flex-start',
+    alignItems: 'center',
+    width: '100%',
+    gap: 30,
+    paddingHorizontal: 10,
+    marginBottom: 70,
+  },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -226,9 +386,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     marginLeft: 8,
-  },
-  backupList: {
-    marginTop: 10,
   },
   backupItem: {
     flexDirection: 'row',
@@ -266,15 +423,6 @@ const styles = StyleSheet.create({
   restoreButton: {
     backgroundColor: '#185abd',
   },
-  bottomBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },  
-  bottomBannerIcon: {
-    marginLeft: 10,
-  },
-  
 });
 
 export default RestoreBackupScreen;

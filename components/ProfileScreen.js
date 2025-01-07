@@ -340,7 +340,7 @@ const ProfileScreen = ({ navigation }) => {
         <TextInput
         style={styles.input}
         placeholder="Correo electrónico"
-        value={email}
+        value={profile.correo}
         onChangeText={(text) => setEmail(text)}
         keyboardType="email-address"
         placeholderTextColor="#999"
