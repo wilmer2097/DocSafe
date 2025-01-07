@@ -202,7 +202,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
           abrirSelectorDocumentos(fileType);
           break;
       }
-    }, 500);
+    }, 1000);
   };
 
   // ------------------------------
@@ -225,18 +225,17 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
     try {
       const imagen = await ImageCropPicker.openCamera({
         cropping: true,
-        freeStyleCropEnabled: true,
         includeBase64: false,
-        compressImageQuality: 0.8,
+        freeStyleCropEnabled: true,
+        width: 3000,
+        height: 3000,
+        compressImageQuality: 1.0,
       });
-      if (!imagen) {
-        console.log('[abrirCamara] No se obtuvo imagen (posible cancel o error).');
-        return;
-      }
 
-      // Generamos un nombre único (jpg por defecto)
+      if (!imagen) return;
+
       const uniqueName = generateUniqueFilename('.jpg');
-      
+  
       if (tipo === 'principal') {
         setPrincipalDocument({
           uri: imagen.path,
@@ -259,7 +258,6 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       }
     } finally {
       setIsPicking(false);
-      console.log('[abrirCamara] Fin. isPicking:', isPicking);
     }
   };
 
@@ -275,22 +273,19 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
     documentNameRef.current?.blur();
     descriptionRef.current?.blur();
     urTextlRef.current?.blur();
-
+    Keyboard.dismiss();
     try {
-      console.log('[abrirGaleria] Llamando a ImageCropPicker.openPicker...');
       const imagen = await ImageCropPicker.openPicker({
         cropping: true,
-        freeStyleCropEnabled: true,
         includeBase64: false,
-        compressImageQuality: 0.8,
+        freeStyleCropEnabled: true,
+        width: 3000,
+        height: 3000,
+        compressImageQuality: 1.0,
       });
-
-      if (!imagen) {
-        console.log('[abrirGaleria] No se obtuvo imagen (posible cancel).');
-        return;
-      }
-
-      // Generamos un nombre único (jpg por defecto)
+      console.log('[abrirCamara] imagen devuelta:', imagen);
+      if (!imagen) return;
+  
       const uniqueName = generateUniqueFilename('.jpg');
       
       if (tipo === 'principal') {
@@ -315,7 +310,6 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       }
     } finally {
       setIsPicking(false);
-      console.log('[abrirGaleria] Fin. isPicking:', isPicking);
     }
   };
 

@@ -87,7 +87,7 @@ const ProfileScreen = ({ navigation }) => {
     fec_fin: '',
     termsAccepted: false,
   });
-
+  const [email, setEmail] = useState('');
   const [firstTime, setFirstTime] = useState(true);
   const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
   const [errorTelefono, setErrorTelefono] = useState(null);
@@ -334,12 +334,12 @@ const ProfileScreen = ({ navigation }) => {
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Correo</Text>
           <TextInput
-            style={styles.input}
-            placeholder="Correo"
-            value={profile.correo}
-            onChangeText={(text) => handleChange('correo', text)}
-            keyboardType="email-address"
-          />
+          style={styles.input}
+          placeholder="Correo"
+          value={profile.correo}
+          onChangeText={(text) => handleChange('correo', text.toLowerCase())}
+          keyboardType="email-address"
+        />
         </View>
 
         <View style={styles.inputContainer}>

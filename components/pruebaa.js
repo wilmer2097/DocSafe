@@ -1,6 +1,6 @@
 // ImageViewerTest.js
 import React, { useState } from 'react';
-import { View, Button, StyleSheet } from 'react-native';
+import { View, Button, StyleSheet, Image } from 'react-native';
 import ImageViewing from 'react-native-image-viewing';
 
 export default function ImageViewerTest() {
@@ -8,8 +8,8 @@ export default function ImageViewerTest() {
 
   // Array de imágenes
   const images = [
-    { uri: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/d0db663bf28844dcbd744935cdd8c71083e0031c-5600x3150.jpg' },
-    { uri: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/77689751053a9cc507696fce850e345776667f0e-2560x1440.jpg' },
+    { uri: Image.resolveAssetSource(require('../src/presentation/assets/Logo.jpg')).uri },
+    { uri: Image.resolveAssetSource(require('../src/presentation/assets/Logo.jpg')).uri },
   ];
 
   return (

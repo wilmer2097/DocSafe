@@ -1,10 +1,4 @@
 # Resolve react_native_pods.rb with node to allow for hoisting
-#require Pod::Executable.execute_command('node', ['-p',
-#  'require.resolve(
-#    "react-native/scripts/react_native_pods.rb",
-#    {paths: [process.argv[1]]},
-#  )', __dir__]).strip
-
 def node_require(script)
   # Resolve script with node to allow for hoisting
   require Pod::Executable.execute_command('node', ['-p',
@@ -17,59 +11,76 @@ end
 node_require('react-native/scripts/react_native_pods.rb')
 node_require('react-native-permissions/scripts/setup.rb')
 
-platform :ios, '15.5'
+platform :ios, '15.5' # Versión mínima de iOS
 prepare_react_native_project!
 
+# Configuración de permisos específicos que usa la app
 setup_permissions([
-  # 'AppTrackingTransparency',
-  # 'Bluetooth',
-  # 'Calendars',
-  # 'CalendarsWriteOnly',
   'Camera',
-  # 'Contacts',
   'FaceID',
-  # 'LocationAccuracy',
-  # 'LocationAlways',
-  # 'LocationWhenInUse',
   'MediaLibrary',
-  # 'Microphone',
-  # 'Motion',
   'Notifications',
   'PhotoLibrary',
   'PhotoLibraryAddOnly',
-  # 'Reminders',
-  # 'Siri',
-  # 'SpeechRecognition',
-  # 'StoreKit',
 ])
 
+# Configuración para frameworks dinámicos (opcional, desactivado por defecto)
 linkage = ENV['USE_FRAMEWORKS']
 if linkage != nil
   Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  #use_frameworks! :linkage => linkage.to_sym
+  # use_frameworks! :linkage => linkage.to_sym
 end
 
 target 'DocSafe' do
   config = use_native_modules!
 
+  # Configuración principal de React Native
   use_react_native!(
     :path => config[:reactNativePath],
-    # An absolute path to your application root.
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
+  # Configuración para pruebas (opcional)
   target 'DocSafeTests' do
     inherit! :complete
     # Pods for testing
   end
 
+  # Post instalación: Solución para problemas comunes
   post_install do |installer|
-    # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
+    # Mostrar mensaje al iniciar post_install
+    puts "Running post_install script..."
+
+    # Configuración estándar de React Native
     react_native_post_install(
       installer,
       config[:reactNativePath],
-      :mac_catalyst_enabled => false,
-      # :ccache_enabled => true
+      :mac_catalyst_enabled => false
     )
+
+    # Excluir arquitecturas arm64 para simuladores (Apple Silicon)
+    installer.pods_project.build_configurations.each do |config|
+      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'arm64'
+    end
+
+    # Solución específica para React-Codegen
+    installer.pods_project.targets.each do |target|
+      if target.name == "React-Codegen"
+        target.build_phases.each do |build_phase|
+          if build_phase.respond_to?(:name) && build_phase.name == "[CP-User] Generate Specs"
+            build_phase.shell_script = <<-SCRIPT
+            bash -l -c "$PODS_ROOT/../../node_modules/react-native/scripts/generate-specs.sh"
+            SCRIPT
+          end
+        end
+      end
+    end
+
+    # Forzar la versión mínima de iOS para todas las dependencias
+    installer.pods_project.targets.each do |target|
+      target.build_configurations.each do |config|
+        config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.5'
+      end
+    end
   end
 end

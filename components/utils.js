@@ -1,15 +1,45 @@
-import { Platform, Alert, Linking, PermissionsAndroid } from 'react-native';
+import { Platform, Alert, PermissionsAndroid } from 'react-native';
 import FileViewer from 'react-native-file-viewer';
 import RNFS from 'react-native-fs';
 
 function getUrlExtension(url) {
-  return url.split(/[#?]/).split(".").pop().trim();
+  return url.split(/[#?]/)[0].split('.').pop().trim().toLowerCase();
 }
 
-export const openDocument = async (uri, mimeType) => {
+function getMimeType(extension) {
+  const mimeTypes = {
+    doc: 'application/msword',
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    xls: 'application/vnd.ms-excel',
+    xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    pdf: 'application/pdf',
+    mp3: 'audio/mpeg',
+    wav: 'audio/wav',
+    aac: 'audio/aac',
+    mp4: 'video/mp4',
+    mov: 'video/quicktime',
+    jpg: 'image/jpeg',
+    jpeg: 'image/jpeg',
+    png: 'image/png',
+    gif: 'image/gif',
+    txt: 'text/plain',
+    html: 'text/html',
+    json: 'application/json',
+    csv: 'text/csv',
+    zip: 'application/zip',
+    rar: 'application/vnd.rar',
+    tar: 'application/x-tar',
+    // Puedes agregar más tipos aquí según sea necesario
+  };
+
+  return mimeTypes[extension] || `application/octet-stream`; // Tipo genérico si no se reconoce la extensión
+}
+
+export const openDocument = async (uri) => {
   try {
     if (!uri || typeof uri !== 'string') {
       console.error('URI inválida:', uri);
+      Alert.alert('Error', 'La URI proporcionada es inválida.');
       return;
     }
 
@@ -19,22 +49,10 @@ export const openDocument = async (uri, mimeType) => {
       return;
     }
 
-    // Determinar el MIME type si no se proporciona
-    if (!mimeType) {
-      if (uri.endsWith('.doc') || uri.endsWith('.docx')) {
-        mimeType = 'application/msword';
-      } else if (uri.endsWith('.xls') || uri.endsWith('.xlsx')) {
-        mimeType = 'application/vnd.ms-excel';
-      } else if (uri.endsWith('.pdf')) {
-        mimeType = 'application/pdf';
-      } else {
-        // Obtener la extensión del archivo a partir de la URL
-        const extension = getUrlExtension(uri);
-        mimeType = `application/${extension}`;
-      }
-    }
+    // Determinar la extensión del archivo
+    const extension = getUrlExtension(uri);
+    const mimeType = getMimeType(extension);
 
-    // Resto del código sigue igual
     if (Platform.OS === 'android') {
       const permissions = [];
 
@@ -83,7 +101,7 @@ export const openDocument = async (uri, mimeType) => {
       }
     } else {
       try {
-        await FileViewer.open(uri, { showOpenWithDialog: true, showAppsSuggestions: true, mimeType });
+        await FileViewer.open(uri, { showOpenWithDialog: true, mimeType });
       } catch (err) {
         console.error('Error al abrir el documento: ', err);
         Alert.alert('Error', 'No se pudo abrir el documento.');

@@ -179,11 +179,13 @@ const DocumentDetail = () => {
     urTextlRef.current?.blur();
     Keyboard.dismiss();
     try {
-      const imagen = await ImageCropPicker.openCamera({
+      const imagen = await ImageCropPicker.openPicker({
         cropping: true,
-        freeStyleCropEnabled: true,
         includeBase64: false,
-        compressImageQuality: 0.8,
+        freeStyleCropEnabled: true,
+        width: 3000,
+        height: 3000,
+        compressImageQuality: 1.0,
       });
       if (!imagen) return;
 
@@ -215,9 +217,11 @@ const DocumentDetail = () => {
     try {
       const imagen = await ImageCropPicker.openPicker({
         cropping: true,
-        freeStyleCropEnabled: true,
         includeBase64: false,
-        compressImageQuality: 0.8,
+        freeStyleCropEnabled: true,
+        width: 3000,
+        height: 3000,
+        compressImageQuality: 1.0,
       });
       if (!imagen) return;
 
@@ -319,7 +323,7 @@ const DocumentDetail = () => {
           abrirDocumentos();
           break;
       }
-    }, 500);
+    }, 1000);
   };
 
 const images = documentFiles

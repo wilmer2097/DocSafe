@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -45,35 +45,66 @@ const DocumentItem = ({ documentName }) => {
     }
   };
 
+  // Chequea las dimensiones de las imágenes locales en iOS
+  // para confirmar que la ruta file://... se esté leyendo bien.
+  const verifyImagesDimensions = async (imageUris) => {
+    for (const img of imageUris) {
+      try {
+        await new Promise((resolve, reject) => {
+          Image.getSize(
+            img.uri,
+            (width, height) => {
+              resolve({ width, height });
+            },
+            (error) => {
+              reject(error);
+            }
+          );
+        });
+      } catch (err) {
+        // -- OPCIONAL: Copiar el archivo a la caché, y actualizar la URI.
+        // const cachePath = `${RNFS.CachesDirectoryPath}/${Date.now()}_temp.jpg`;
+        // try {
+        //   await RNFS.copyFile(img.uri.replace('file://', ''), cachePath);
+        //   img.uri = `file://${cachePath}`;
+        //   console.log('[verifyImagesDimensions] -> Copia a cachePath exitosa:', cachePath);
+        // } catch (copyError) {
+        //   console.error('Error al copiar a cachePath:', copyError);
+        // }
+      }
+    }
+  };
 
   const loadDocumentData = async () => {
     const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
-  
     try {
       const filesDataExists = await RNFS.exists(filesJsonPath);
       if (!filesDataExists) {
-        console.error('Archivo JSON no encontrado:', filesJsonPath);
         showCustomAlert('Error', 'No se pudo cargar el archivo de datos.');
         return;
       }
-  
+
       const filesData = await RNFS.readFile(filesJsonPath);
       const parsedFilesData = JSON.parse(filesData);
       const document = parsedFilesData.archivos.find(doc => doc.nombre === documentName);
-  
+
       if (document) {
         setDocumentData(document);
-  
+
         const currentDate = new Date();
         const expiryDate = new Date(document.expiryDate);
         setIsExpired(expiryDate < currentDate);
-  
+
         const imageUris = document.imagenes.map(file => ({
           uri: `file://${RNFS.DocumentDirectoryPath}/DocSafe/${file}`,
         }));
         setImages(imageUris);
-  
+
         setFileType(getFileType(document.imagenes[0]));
+
+        // Verifica que iOS pueda leer las dimensiones (para permitir pinch zoom).
+        verifyImagesDimensions(imageUris);
+
       } else {
         console.error('Documento no encontrado en archivos JSON');
       }
@@ -198,12 +229,14 @@ const DocumentItem = ({ documentName }) => {
         </TouchableOpacity>
       </View>
 
+      {/* Visor de imágenes con props relevantes para zoom */}
       <ImageViewing
         images={images}
         imageIndex={initialIndex}
         visible={isImageViewerVisible}
         onRequestClose={() => setIsImageViewerVisible(false)}
         doubleTapToZoomEnabled={true}
+        swipeToCloseEnabled={false} // Desactiva swipe-to-close para evitar conflicto de gestos en iOS
       />
 
       {showAlert && (
