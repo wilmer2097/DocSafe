@@ -1,15 +1,15 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { 
-  faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileImage, 
-  faFileAlt, faFileArchive, faFileVideo, faFileAudio, faEye, faLink, faShareAlt 
+import {
+  faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileImage,
+  faFileAlt, faFileArchive, faFileVideo, faFileAudio, faEye, faLink, faShareAlt
 } from '@fortawesome/free-solid-svg-icons';
-import CustomImageViewer from './CustomImageViewer'; 
-import CustomAlert from './CustomAlert'; 
+import ImageViewing from 'react-native-image-viewing';
+import CustomAlert from './CustomAlert';
 import { openDocument } from './utils';
-import Share from 'react-native-share'; 
+import Share from 'react-native-share';
 import RNFS from 'react-native-fs';
 
 const DocumentItem = ({ documentName }) => {
@@ -17,11 +17,9 @@ const DocumentItem = ({ documentName }) => {
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [documentData, setDocumentData] = useState(null);
   const [images, setImages] = useState([]);
-  const [processedImages, setProcessedImages] = useState([]);
   const [fileType, setFileType] = useState(null);
   const [initialIndex, setInitialIndex] = useState(0);
   const [isExpired, setIsExpired] = useState(false);
-
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
 
@@ -35,121 +33,52 @@ const DocumentItem = ({ documentName }) => {
 
     const extension = fileName.split('.').pop().toLowerCase();
     switch (extension) {
-      case 'pdf':
-        return { icon: faFilePdf, color: '#f40000' };
-      case 'doc':
-      case 'docx':
-        return { icon: faFileWord, color: '#1e90ff' };
-      case 'xls':
-      case 'xlsx':
-        return { icon: faFileExcel, color: '#28a745' };
-      case 'ppt':
-      case 'pptx':
-        return { icon: faFilePowerpoint, color: '#ff6347' };
-      case 'jpg':
-      case 'jpeg':
-      case 'png':
-        return { icon: faFileImage, color: '#ffb100' };
-      case 'zip':
-      case 'rar':
-        return { icon: faFileArchive, color: '#f39c12' };
-      case 'mp4':
-      case 'mkv':
-        return { icon: faFileVideo, color: '#f1c40f' };
-      case 'mp3':
-      case 'wav':
-        return { icon: faFileAudio, color: '#8e44ad' };
-      default:
-        return { icon: faFileAlt, color: '#6c757d' };
+      case 'pdf': return { icon: faFilePdf, color: '#f40000' };
+      case 'doc': case 'docx': return { icon: faFileWord, color: '#1e90ff' };
+      case 'xls': case 'xlsx': return { icon: faFileExcel, color: '#28a745' };
+      case 'ppt': case 'pptx': return { icon: faFilePowerpoint, color: '#ff6347' };
+      case 'jpg': case 'jpeg': case 'png': return { icon: faFileImage, color: '#ffb100' };
+      case 'zip': case 'rar': return { icon: faFileArchive, color: '#f39c12' };
+      case 'mp4': case 'mkv': return { icon: faFileVideo, color: '#f1c40f' };
+      case 'mp3': case 'wav': return { icon: faFileAudio, color: '#8e44ad' };
+      default: return { icon: faFileAlt, color: '#6c757d' };
     }
   };
 
-  const getMimeType = (fileUri) => {
-    const extension = fileUri.split('.').pop().toLowerCase();
-    switch (extension) {
-      case 'pdf':
-        return 'application/pdf';
-      case 'doc':
-      case 'docx':
-        return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      case 'xls':
-      case 'xlsx':
-        return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-      case 'ppt':
-      case 'pptx':
-        return 'application/vnd.ms-powerpoint';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      case 'mp3':
-      case 'wav':
-        return 'audio/*';
-      case 'mp4':
-      case 'mkv':
-        return 'video/*';
-      default:
-        return '*/*';
-    }
-  };
 
   const loadDocumentData = async () => {
     const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
   
     try {
       const filesDataExists = await RNFS.exists(filesJsonPath);
-      if (filesDataExists) {
-        const filesData = await RNFS.readFile(filesJsonPath);
-        const parsedFilesData = JSON.parse(filesData);
-        const document = parsedFilesData.archivos.find(doc => doc.nombre === documentName);
+      if (!filesDataExists) {
+        console.error('Archivo JSON no encontrado:', filesJsonPath);
+        showCustomAlert('Error', 'No se pudo cargar el archivo de datos.');
+        return;
+      }
   
-        if (document) {
-          setDocumentData(document);
+      const filesData = await RNFS.readFile(filesJsonPath);
+      const parsedFilesData = JSON.parse(filesData);
+      const document = parsedFilesData.archivos.find(doc => doc.nombre === documentName);
   
-          const currentDate = new Date();
-          const expiryDate = new Date(document.expiryDate);
-          setIsExpired(expiryDate < currentDate);
+      if (document) {
+        setDocumentData(document);
   
-          const imageUris = [];
-          for (const file of document.imagenes) {
-            const filePath = `${RNFS.DocumentDirectoryPath}/DocSafe/${file}`;
-            const fileExists = await RNFS.exists(filePath);
-            if (fileExists) {
-              imageUris.push({
-                uri: `file://${filePath}`,
-                fileName: file,
-                type: getMimeType(`file://${filePath}`),
-                originalPath: filePath
-              });
-            }
-          }
-          
-          setImages(imageUris);
-          
-          const processedImageUris = imageUris.map(img => ({
-            uri: img.uri,
-            type: img.type,
-            title: img.fileName,
-            enablePanZoom: true,
-            dimensions: {
-              width: 0,
-              height: 0
-            }
-          }));
-          
-          setProcessedImages(processedImageUris);
+        const currentDate = new Date();
+        const expiryDate = new Date(document.expiryDate);
+        setIsExpired(expiryDate < currentDate);
   
-          if (imageUris.length > 0) {
-            setFileType(getFileType(document.imagenes[0]));
-          } else {
-            console.warn('No se encontraron imágenes válidas para mostrar.');
-            setFileType(getFileType('unknown.ext'));
-          }
-        }
+        const imageUris = document.imagenes.map(file => ({
+          uri: `file://${RNFS.DocumentDirectoryPath}/DocSafe/${file}`,
+        }));
+        setImages(imageUris);
+  
+        setFileType(getFileType(document.imagenes[0]));
+      } else {
+        console.error('Documento no encontrado en archivos JSON');
       }
     } catch (error) {
-      console.error('Error loading document data:', error);
+      console.error('Error cargando datos del documento:', error);
       showCustomAlert('Error', 'No se pudo cargar los datos del documento.');
     }
   };
@@ -161,9 +90,7 @@ const DocumentItem = ({ documentName }) => {
   );
 
   const handleOpenDocument = async (index) => {
-    if (documentData && documentData.url && (!documentData.imagenes || documentData.imagenes.length === 0)) {
-      handleOpenURL();
-    } else if (fileType?.icon === faFileImage && processedImages.length > 0) {
+    if (fileType?.icon === faFileImage && images.length > 0) {
       setInitialIndex(index);
       setIsImageViewerVisible(true);
     } else {
@@ -177,6 +104,7 @@ const DocumentItem = ({ documentName }) => {
 
   const handleViewDetails = () => {
     if (documentData) {
+      console.log('Datos del documento antes de navegar:', documentData);
       navigation.navigate('DocumentDetail', { document: documentData });
     } else {
       showCustomAlert('Error', 'No se pudieron cargar los detalles del documento.');
@@ -212,7 +140,6 @@ const DocumentItem = ({ documentName }) => {
         title: 'Compartir Documento',
         urls: fileUris,
         message: `Documento: ${documentName}`,
-        type: images[0]?.type || '*/*',
       };
 
       await Share.open(shareOptions);
@@ -222,10 +149,6 @@ const DocumentItem = ({ documentName }) => {
     }
   };
 
-  const handleImageLoadError = () => {
-    showCustomAlert('Error', 'El archivo no existe o no se pudo cargar.');
-  };
-
   return (
     <View style={[styles.itemContainer, isExpired && styles.expiredContainer]}>
       <TouchableOpacity style={styles.previewContainer} onPress={() => handleOpenDocument(0)}>
@@ -233,13 +156,12 @@ const DocumentItem = ({ documentName }) => {
           <Image
             source={{ uri: images[0]?.uri }}
             style={styles.imagePreview}
-            onError={handleImageLoadError}
           />
         ) : (
           <View style={[styles.iconContainer, { backgroundColor: fileType?.color || '#6c757d' }]}>
-            <FontAwesomeIcon 
-              icon={fileType?.icon || faFileAlt} 
-              size={24} 
+            <FontAwesomeIcon
+              icon={fileType?.icon || faFileAlt}
+              size={24}
               color="#ffffff"
             />
           </View>
@@ -255,20 +177,20 @@ const DocumentItem = ({ documentName }) => {
           )}
         </View>
       </TouchableOpacity>
-      
+
       <View style={styles.buttonContainer}>
         <TouchableOpacity style={styles.actionButton} onPress={handleViewDetails}>
           <FontAwesomeIcon icon={faEye} size={20} color="#185abd" />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionButton} 
+        <TouchableOpacity
+          style={styles.actionButton}
           onPress={documentData?.url ? handleOpenURL : () => showCustomAlert('Error', 'Este documento no tiene una URL asociada.')}
           disabled={!documentData?.url}
         >
-          <FontAwesomeIcon 
-            icon={faLink} 
-            size={20} 
-            color={documentData?.url ? "#185abd" : "#a9a9a9"} 
+          <FontAwesomeIcon
+            icon={faLink}
+            size={20}
+            color={documentData?.url ? "#185abd" : "#a9a9a9"}
           />
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
@@ -276,21 +198,12 @@ const DocumentItem = ({ documentName }) => {
         </TouchableOpacity>
       </View>
 
-      <CustomImageViewer
+      <ImageViewing
+        images={images}
+        imageIndex={initialIndex}
         visible={isImageViewerVisible}
-        images={processedImages}
-        initialIndex={initialIndex}
-        onClose={() => setIsImageViewerVisible(false)}
-        documentName={documentName}
-        enableZoom={true}
-        maxZoomScale={3}
-        enableSwipe={true}
-        enablePanZoom={true}
-        onImageLoad={(index, dimensions) => {
-          const updatedImages = [...processedImages];
-          updatedImages[index].dimensions = dimensions;
-          setProcessedImages(updatedImages);
-        }}
+        onRequestClose={() => setIsImageViewerVisible(false)}
+        doubleTapToZoomEnabled={true}
       />
 
       {showAlert && (
@@ -315,10 +228,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: 12,
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.22,
-    shadowRadius: 2.22,
   },
   previewContainer: {
     flexDirection: 'row',

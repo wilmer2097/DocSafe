@@ -1,298 +1,234 @@
-// CustomImageViewer.js
-import React, { useState, useEffect, useCallback } from 'react';
-import {
-  StyleSheet,
-  Modal,
-  FlatList,
-  TouchableOpacity,
-  Alert,
-  useWindowDimensions,
-} from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-import { faTimes, faShareAlt } from '@fortawesome/free-solid-svg-icons';
-import RNFS from 'react-native-fs';
-import Share from 'react-native-share';
-
 import {
-  GestureHandlerRootView,
-  GestureDetector,
-  Gesture,
-} from 'react-native-gesture-handler';
+  faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileImage,
+  faFileAlt, faFileArchive, faFileVideo, faFileAudio, faEye, faLink, faShareAlt
+} from '@fortawesome/free-solid-svg-icons';
+import ImageViewing from 'react-native-image-viewing';
+import CustomAlert from './CustomAlert';
+import { openDocument } from './utils';
+import Share from 'react-native-share';
+import RNFS from 'react-native-fs';
 
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  runOnJS,
-  useAnimatedRef,
-  Easing,
-  useAnimatedScrollHandler,
-} from 'react-native-reanimated';
-
-export default function CustomImageViewer({
-  visible,
-  images,
-  initialIndex = 0,
-  onClose,
-  documentName,
-}) {
-  const [currentIndex, setCurrentIndex] = useState(initialIndex);
-  const [canScroll, setCanScroll] = useState(true); // Permitir swipe horizontal
+const DocumentItem = ({ documentName }) => {
+  const navigation = useNavigation();
+  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
   const [documentData, setDocumentData] = useState(null);
+  const [images, setImages] = useState([]);
+  const [fileType, setFileType] = useState(null);
+  const [initialIndex, setInitialIndex] = useState(0);
+  const [isExpired, setIsExpired] = useState(false);
 
-  // Animación para fade in/out
-  const fadeAnim = useSharedValue(0);
+  const [showAlert, setShowAlert] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
 
-  // Zoom/Pan
-  const scale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
+  const showCustomAlert = (title, message) => {
+    setAlertConfig({ title, message });
+    setShowAlert(true);
+  };
 
-  // Ref a la FlatList
-  const flatListRef = useAnimatedRef();
+  const getFileType = (fileName) => {
+    if (!fileName) return { icon: faFileAlt, color: '#6c757d' };
 
-  // Dimensiones de ventana
-  const { width, height } = useWindowDimensions();
-
-  // Efecto al mostrar/ocultar
-  useEffect(() => {
-    if (visible) {
-      fadeAnim.value = withTiming(1, { duration: 300, easing: Easing.ease });
-      loadDocumentData(); // si lo necesitas
-    } else {
-      setCurrentIndex(initialIndex);
+    const extension = fileName.split('.').pop().toLowerCase();
+    switch (extension) {
+      case 'pdf':
+        return { icon: faFilePdf, color: '#f40000' };
+      case 'doc':
+      case 'docx':
+        return { icon: faFileWord, color: '#1e90ff' };
+      case 'xls':
+      case 'xlsx':
+        return { icon: faFileExcel, color: '#28a745' };
+      case 'ppt':
+      case 'pptx':
+        return { icon: faFilePowerpoint, color: '#ff6347' };
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return { icon: faFileImage, color: '#ffb100' };
+      case 'zip':
+      case 'rar':
+        return { icon: faFileArchive, color: '#f39c12' };
+      case 'mp4':
+      case 'mkv':
+        return { icon: faFileVideo, color: '#f1c40f' };
+      case 'mp3':
+      case 'wav':
+        return { icon: faFileAudio, color: '#8e44ad' };
+      default:
+        return { icon: faFileAlt, color: '#6c757d' };
     }
-  }, [visible, initialIndex]);
+  };
 
-  // Carga doc (si lo necesitas para compartir)
   const loadDocumentData = async () => {
-    try {
-      const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
-      const filesDataExists = await RNFS.exists(filesJsonPath);
+    const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
 
+    try {
+      const filesDataExists = await RNFS.exists(filesJsonPath);
       if (filesDataExists) {
         const filesData = await RNFS.readFile(filesJsonPath);
         const parsedFilesData = JSON.parse(filesData);
-        const doc = parsedFilesData.archivos.find(
-          (d) => d.nombre === documentName
-        );
-        if (doc) {
-          console.log('[CustomImageViewer] Document data found:', doc.nombre);
-          setDocumentData(doc);
-        } else {
-          console.log('[CustomImageViewer] No doc found with nombre=', documentName);
+        const document = parsedFilesData.archivos.find(doc => doc.nombre === documentName);
+
+        if (document) {
+          setDocumentData(document);
+
+          const currentDate = new Date();
+          const expiryDate = new Date(document.expiryDate);
+          setIsExpired(expiryDate < currentDate);
+
+          const imageUris = document.imagenes.map(file => ({
+            uri: `file://${RNFS.DocumentDirectoryPath}/DocSafe/${file}`,
+          }));
+          setImages(imageUris);
+
+          setFileType(getFileType(document.imagenes[0]));
         }
       }
     } catch (error) {
-      console.error('[CustomImageViewer] Error loading doc data:', error);
+      console.error('Error loading document data:', error);
+      showCustomAlert('Error', 'No se pudo cargar los datos del documento.');
     }
   };
 
-  // Reset de zoom/pan
-  const resetValues = useCallback(() => {
-    'worklet';
-    console.log('[resetValues] → scale=1, translating=0');
-    scale.value = 1;
-    translateX.value = 0;
-    translateY.value = 0;
-    runOnJS(setCanScroll)(true);
-  }, []);
-
-  // Gestos
-  const pinchGesture = Gesture.Pinch()
-    .onUpdate((event) => {
-      'worklet';
-      scale.value = event.scale;
-      if (event.scale > 1) {
-        runOnJS(setCanScroll)(false);
-      }
-    })
-    .onEnd(() => {
-      'worklet';
-      if (scale.value <= 1) {
-        resetValues();
-      }
-    });
-
-  const panGesture = Gesture.Pan()
-    .onUpdate((event) => {
-      'worklet';
-      if (scale.value > 1) {
-        translateX.value = event.translationX;
-        translateY.value = event.translationY;
-      }
-    })
-    .onEnd(() => {
-      'worklet';
-      if (scale.value <= 1) {
-        translateX.value = withSpring(0);
-        translateY.value = withSpring(0);
-      }
-    });
-
-  const doubleTapGesture = Gesture.Tap()
-    .numberOfTaps(2)
-    .onStart(() => {
-      'worklet';
-      if (scale.value > 1) {
-        resetValues();
-      } else {
-        scale.value = withSpring(2);
-        runOnJS(setCanScroll)(false);
-      }
-    });
-
-  // Combinar gestos
-  const composedGesture = Gesture.Simultaneous(
-    doubleTapGesture,
-    pinchGesture,
-    panGesture
+  useFocusEffect(
+    useCallback(() => {
+      loadDocumentData();
+    }, [documentName])
   );
 
-  // Estilo animado de la imagen
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { scale: scale.value },
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-    ],
-  }));
-
-  // Fade in/out container
-  const fadeStyle = useAnimatedStyle(() => ({
-    opacity: fadeAnim.value,
-  }));
-
-  // Manejo de scroll horizontal
-  const scrollHandler = useAnimatedScrollHandler({
-    onMomentumEnd: (event) => {
-      const offsetX = event.contentOffset.x;
-      const newIndex = Math.round(offsetX / width);
-      console.log(
-        '[scrollHandler] onMomentumEnd offsetX=',
-        offsetX,
-        ' newIndex=',
-        newIndex
-      );
-      runOnJS(setCurrentIndex)(newIndex);
-      runOnJS(resetValues)();
-    },
-  });
-
-  // Función cerrar
-  const handleClose = () => {
-    console.log('[handleClose] → anim fade out');
-    fadeAnim.value = withTiming(0, { duration: 300, easing: Easing.ease }, () => {
-      runOnJS(onClose)();
-    });
+  const handleOpenDocument = async (index) => {
+    if (fileType?.icon === faFileImage && images.length > 0) {
+      setInitialIndex(index);
+      setIsImageViewerVisible(true);
+    } else {
+      try {
+        await openDocument(images[index]?.uri, fileType?.mimeType);
+      } catch (error) {
+        showCustomAlert('Error', 'No se pudo abrir el documento.');
+      }
+    }
   };
 
-  // Compartir la imagen actual
+  const handleViewDetails = () => {
+    if (documentData) {
+      navigation.navigate('DocumentDetail', { document: documentData });
+    } else {
+      showCustomAlert('Error', 'No se pudieron cargar los detalles del documento.');
+    }
+  };
+
+  const handleOpenURL = async () => {
+    if (documentData && documentData.url) {
+      let url = documentData.url.trim();
+      if (!/^https?:\/\//i.test(url)) {
+        url = `https://${url}`;
+      }
+      try {
+        await Linking.openURL(url);
+      } catch (error) {
+        showCustomAlert('Error', 'No se pudo abrir la URL.');
+      }
+    } else {
+      showCustomAlert('Error', 'No se proporcionó una URL válida.');
+    }
+  };
+
   const handleShare = async () => {
     try {
-      if (!documentData || !documentData.imagenes || documentData.imagenes.length === 0) {
-        Alert.alert('Error', 'No hay imágenes disponibles para compartir.');
+      const fileUris = images.map(img => img.uri);
+
+      if (fileUris.length === 0) {
+        showCustomAlert('Error', 'No hay archivos para compartir.');
         return;
       }
-      const fileName = documentData.imagenes[currentIndex];
-      const fileUri = `file://${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`;
-      if (!fileUri) {
-        Alert.alert('Error', 'No hay archivo disponible para compartir.');
-        return;
-      }
-      const mimeType = getMimeType(fileUri) || '*/*';
 
       const shareOptions = {
-        title: 'Compartir Imagen',
-        url: fileUri,
-        message: `Mira esta imagen: ${documentName}`,
-        type: mimeType,
+        title: 'Compartir Documento',
+        urls: fileUris,
+        message: `Documento: ${documentName}`,
+        type: images[0]?.type || '*/*',
       };
 
       await Share.open(shareOptions);
     } catch (error) {
-      console.error('[CustomImageViewer] Error al compartir:', error);
+      console.error('Error al compartir el documento:', error);
+      showCustomAlert('Error', 'No se pudo compartir el documento.');
     }
   };
-
-  const getMimeType = (fileUri) => {
-    const extension = fileUri.split('.').pop()?.toLowerCase();
-    switch (extension) {
-      case 'pdf':
-        return 'application/pdf';
-      case 'jpg':
-      case 'jpeg':
-        return 'image/jpeg';
-      case 'png':
-        return 'image/png';
-      default:
-        return '*/*';
-    }
-  };
-
-  // Renderiza cada página
-  const renderImage = useCallback(
-    ({ item, index }) => {
-      console.log('[renderImage] index=', index, ' uri=', item.uri);
-      return (
-        <GestureHandlerRootView style={{ width, height }}>
-          <GestureDetector gesture={composedGesture}>
-            <Animated.View style={styles.imageContainer}>
-              <Animated.Image
-                source={{ uri: item.uri }}
-                style={[styles.image, { width, height }, animatedStyle]}
-                resizeMode="contain"
-              />
-            </Animated.View>
-          </GestureDetector>
-        </GestureHandlerRootView>
-      );
-    },
-    [width, height, animatedStyle, composedGesture]
-  );
 
   return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="none"
-      onRequestClose={handleClose}
-    >
-      <Animated.View style={[styles.modalContainer, fadeStyle]}>
-        <Animated.FlatList
-          ref={flatListRef}
-          data={images}
-          renderItem={renderImage}
-          keyExtractor={(item, i) => `${item.uri}-${i}`}
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          initialScrollIndex={currentIndex}
-          onScroll={scrollHandler}
-          scrollEventThrottle={16}
-          // Forzamos que cada ítem sea width px para que pagingEnabled funcione
-          getItemLayout={(_, i) => ({
-            length: width,
-            offset: width * i,
-            index: i,
-          })}
-          scrollEnabled={canScroll}
+    <View style={[styles.itemContainer, isExpired && styles.expiredContainer]}>
+      <TouchableOpacity style={styles.previewContainer} onPress={() => handleOpenDocument(0)}>
+        {fileType?.icon === faFileImage && images[0]?.uri ? (
+          <Image
+            source={{ uri: images[0]?.uri }}
+            style={styles.imagePreview}
+          />
+        ) : (
+          <View style={[styles.iconContainer, { backgroundColor: fileType?.color || '#6c757d' }]}>
+            <FontAwesomeIcon
+              icon={fileType?.icon || faFileAlt}
+              size={24}
+              color="#ffffff"
+            />
+          </View>
+        )}
+        <View style={styles.textContainer}>
+          <Text style={styles.documentName} numberOfLines={1}>{documentName}</Text>
+          {isExpired ? (
+            <Text style={styles.expiredText}>Documento expirado</Text>
+          ) : (
+            <Text style={styles.documentDescription} numberOfLines={1}>
+              {documentData?.descripcion}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity style={styles.actionButton} onPress={handleViewDetails}>
+          <FontAwesomeIcon icon={faEye} size={20} color="#185abd" />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.actionButton}
+          onPress={documentData?.url ? handleOpenURL : () => showCustomAlert('Error', 'Este documento no tiene una URL asociada.')}
+          disabled={!documentData?.url}
+        >
+          <FontAwesomeIcon
+            icon={faLink}
+            size={20}
+            color={documentData?.url ? "#185abd" : "#a9a9a9"}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
+          <FontAwesomeIcon icon={faShareAlt} size={20} color="#185abd" />
+        </TouchableOpacity>
+      </View>
+
+      <ImageViewing
+        images={images}
+        imageIndex={initialIndex}
+        visible={isImageViewerVisible}
+        onRequestClose={() => setIsImageViewerVisible(false)}
+        doubleTapToZoomEnabled={true}
+      />
+
+      {showAlert && (
+        <CustomAlert
+          visible={showAlert}
+          onClose={() => setShowAlert(false)}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          onAccept={() => setShowAlert(false)}
         />
-
-        {/* Botón Cerrar */}
-        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
-          <FontAwesomeIcon icon={faTimes} size={24} color="#ffffff" />
-        </TouchableOpacity>
-
-        {/* Botón Compartir */}
-        <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-          <FontAwesomeIcon icon={faShareAlt} size={24} color="#ffffff" />
-        </TouchableOpacity>
-      </Animated.View>
-    </Modal>
+      )}
+    </View>
   );
-}
+};
 
 const styles = StyleSheet.create({
   modalContainer: {

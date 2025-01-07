@@ -1,5 +1,15 @@
-import React, { useState, useCallback } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, SafeAreaView, Dimensions, Alert } from 'react-native';
+import React, { useState, useCallback, useEffect } from 'react';
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Image,
+  SafeAreaView,
+  Dimensions
+} from 'react-native';
 import RNFS from 'react-native-fs';
 import { useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -21,6 +31,31 @@ const LoginScreen = ({ navigation }) => {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertData, setAlertData] = useState({ title: '', message: '', token: '' });
 
+  // Texto que se mostrará en el botón biométrico según el sensor disponible.
+  const [sensorLabel, setSensorLabel] = useState('Iniciar sesión con biometría');
+
+  // Al montar el componente, verificamos el tipo de sensor biométrico disponible.
+  useEffect(() => {
+    const checkBiometry = async () => {
+      const rnBiometrics = new ReactNativeBiometrics();
+      const { available, biometryType } = await rnBiometrics.isSensorAvailable();
+
+      if (available) {
+        if (biometryType === 'FaceID') {
+          setSensorLabel('Iniciar sesión con Face ID');
+        } else if (biometryType === 'TouchID') {
+          setSensorLabel('Iniciar sesión con Touch ID');
+        } else {
+          // Para la mayoría de dispositivos Android (y algunos iOS genéricos) será 'Biometrics'
+          setSensorLabel('Iniciar sesión con huella digital');
+        }
+      } else {
+        setSensorLabel('Biometría no disponible');
+      }
+    };
+    checkBiometry();
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       const loadProfileData = async () => {
@@ -31,11 +66,10 @@ const LoginScreen = ({ navigation }) => {
           if (profileExists) {
             const profileData = await RNFS.readFile(profilePath);
             const { perfilUsuario } = JSON.parse(profileData);
-            
+
             setSavedCode(perfilUsuario.loginCode);
             setSelectedCountry({ dial_code: '+51', flag: '🇵🇪' });
             setSavedEmail(perfilUsuario.correo);
-            // Removed setSelectedCountry as it is not defined
             setBiometricsEnabled(perfilUsuario.biometricsEnabled || false);
             setFirstTime(false);
           } else {
@@ -83,7 +117,7 @@ const LoginScreen = ({ navigation }) => {
       if (firstTime) {
         // Realizar la validación con el webhook solo si es la primera vez
         const loginData = {
-          a: "login_auth",
+          a: 'login_auth',
           correo: email,
           tec_ope_pass: code,
         };
@@ -99,9 +133,9 @@ const LoginScreen = ({ navigation }) => {
           const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
           const profileData = {
             perfilUsuario: {
-              estado: result.cliente_data.bestado === 1 ? "Activo" : "Inactivo",
+              estado: result.cliente_data.bestado === 1 ? 'Activo' : 'Inactivo',
               name: result.cliente_data.nombre,
-              profileImage: "",
+              profileImage: '',
               loginCode: code,
               ciudad: result.cliente_data.ciudad,
               telefono: result.cliente_data.telefono,
@@ -117,7 +151,10 @@ const LoginScreen = ({ navigation }) => {
         } else {
           setCode(''); // Limpia el código si es incorrecto
           if (result.message && result.message.toLowerCase().includes('correo ya registrado')) {
-            showCustomAlert('Cuenta existente', 'El correo ya está registrado. Inicie sesión o use otro correo.');
+            showCustomAlert(
+              'Cuenta existente',
+              'El correo ya está registrado. Inicie sesión o use otro correo.'
+            );
           } else {
             showCustomAlert('Error', result.message || 'Código o correo incorrecto. Inténtalo de nuevo.');
           }
@@ -141,34 +178,45 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleBiometricLogin = async () => {
+    // Verificamos si el usuario tiene habilitada la opción en su perfil.
     if (!biometricsEnabled) {
       showCustomAlert('Error', 'La autenticación biométrica no está habilitada en el perfil.');
       return;
     }
-  
+
+    // Si el sensorLabel indica que no hay biometría disponible, también evitamos el prompt
+    if (sensorLabel === 'Biometría no disponible') {
+      showCustomAlert('Error', 'El dispositivo no cuenta con Face ID / Touch ID / huella configurada.');
+      return;
+    }
+
     try {
+      // Instanciamos ReactNativeBiometrics
+      const rnBiometrics = new ReactNativeBiometrics();
+      // Pedimos la autenticación
       const { success } = await rnBiometrics.simplePrompt({
-        promptMessage: 'Verifica tu identidad con Face ID / Touch ID',
+        promptMessage: 'Verifica tu identidad',
       });
-  
+
       if (success) {
         navigation.navigate('Home');
       } else {
-        showCustomAlert('Error', 'Autenticación biométrica fallida.');
+        showCustomAlert('Error', 'Autenticación biométrica cancelada o fallida.');
       }
     } catch (error) {
       console.error('Error durante la autenticación biométrica:', error);
       showCustomAlert('Error', 'Autenticación biométrica no disponible en este dispositivo.');
     }
   };
-  
-  
 
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.docSafe}>DocSafe</Text>
-        <Image source={require('../src/presentation/assets/Logo.jpg')} style={styles.profileImage} />
+        <Image
+          source={require('../src/presentation/assets/Logo.jpg')}
+          style={styles.profileImage}
+        />
         {firstTime && (
           <TextInput
             style={styles.input}
@@ -223,9 +271,18 @@ const LoginScreen = ({ navigation }) => {
           <FontAwesomeIcon icon={faKey} size={20} color="#155abd" />
           <Text style={styles.forgotPasswordText}>Recuperar Token ID</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.biometricButton} onPress={handleBiometricLogin}>
+        
+        {/* Botón biométrico */}
+        <TouchableOpacity
+          style={[
+            styles.biometricButton,
+            sensorLabel === 'Biometría no disponible' && { opacity: 0.5 },
+          ]}
+          onPress={handleBiometricLogin}
+          disabled={sensorLabel === 'Biometría no disponible'}
+        >
           <FontAwesomeIcon icon={faFingerprint} size={24} color="#fff" />
-          <Text style={styles.biometricButtonText}>Iniciar sesión con huella digital</Text>
+          <Text style={styles.biometricButtonText}>{sensorLabel}</Text>
         </TouchableOpacity>
       </View>
       <CustomAlert
@@ -240,24 +297,101 @@ const LoginScreen = ({ navigation }) => {
   );
 };
 
+// Estilos
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
-  content: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
-  docSafe: { fontSize: 40, color: '#155abd', fontWeight: 'bold', marginBottom: 20 },
-  profileImage: { width: 120, height: 120, borderRadius: 60, borderWidth: 3, borderColor: '#155abd', marginBottom: 30 },
-  input: { width: '80%', padding: 10, borderWidth: 1, borderColor: '#155abd', borderRadius: 10, marginBottom: 20 },
+  content: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20
+  },
+  docSafe: {
+    fontSize: 40,
+    color: '#155abd',
+    fontWeight: 'bold',
+    marginBottom: 20
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderWidth: 3,
+    borderColor: '#155abd',
+    marginBottom: 30
+  },
+  input: {
+    width: '80%',
+    padding: 10,
+    borderWidth: 1,
+    borderColor: '#155abd',
+    borderRadius: 10,
+    marginBottom: 20
+  },
   title: { fontSize: 24, fontWeight: '600', color: '#333', marginBottom: 30 },
-  codeContainer: { flexDirection: 'row', justifyContent: 'space-between', width: width * 0.6, marginBottom: 30 },
-  codeDot: { width: 20, height: 20, borderRadius: 10, borderWidth: 2, borderColor: '#155abd', justifyContent: 'center', alignItems: 'center' },
-  codeFilledDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#155abd' },
-  keypadContainer: { width: width * 0.8, flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  keypadButton: { width: width * 0.24, height: width * 0.14, justifyContent: 'center', alignItems: 'center', backgroundColor: '#155abd', borderRadius: 10, marginBottom: 15 },
+  codeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: width * 0.6,
+    marginBottom: 30
+  },
+  codeDot: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#155abd',
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  codeFilledDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: '#155abd'
+  },
+  keypadContainer: {
+    width: width * 0.8,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between'
+  },
+  keypadButton: {
+    width: width * 0.24,
+    height: width * 0.14,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#155abd',
+    borderRadius: 10,
+    marginBottom: 15
+  },
   specialButton: { backgroundColor: '#1e7eff' },
   keypadButtonText: { color: '#fff', fontSize: 24, fontWeight: '600' },
-  forgotPasswordButton: { flexDirection: 'row', alignItems: 'center', marginTop: 30 },
-  forgotPasswordText: { color: '#155abd', fontSize: 16, fontWeight: '600', marginLeft: 10 },
-  biometricButton: { marginTop: 20, flexDirection: 'row', alignItems: 'center', backgroundColor: '#155abd', padding: 10, borderRadius: 10 },
-  biometricButtonText: { color: '#fff', fontSize: 16, marginLeft: 10, fontWeight: '600' },
+  forgotPasswordButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 30
+  },
+  forgotPasswordText: {
+    color: '#155abd',
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 10
+  },
+  biometricButton: {
+    marginTop: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#155abd',
+    padding: 10,
+    borderRadius: 10
+  },
+  biometricButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    marginLeft: 10,
+    fontWeight: '600'
+  },
 });
 
 export default LoginScreen;

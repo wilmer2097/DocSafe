@@ -1,5 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TextInput, TouchableOpacity, Image, StyleSheet, KeyboardAvoidingView, Modal, TouchableWithoutFeedback, Linking, Switch } from 'react-native';
+import {
+  ScrollView,
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Image,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Modal,
+  TouchableWithoutFeedback,
+  Linking,
+  Switch
+} from 'react-native';
 import RNFS from 'react-native-fs';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import CustomAlert from './CustomAlert';
@@ -10,11 +23,11 @@ import CheckBox from '@react-native-community/checkbox';
 import * as RNLocalize from 'react-native-localize';
 
 const countryDataList = [
-  { dial_code: '+1', flag: '🇺🇸', name: 'United States' },
-  { dial_code: '+51', flag: '🇵🇪', name: 'Peru' },
-  { dial_code: '+52', flag: '🇲🇽', name: 'Mexico' },
+  { dial_code: '+1', flag: '🇺🇸', name: 'Estados Unidos' },
+  { dial_code: '+51', flag: '🇵🇪', name: 'Perú' },
+  { dial_code: '+52', flag: '🇲🇽', name: 'México' },
   { dial_code: '+54', flag: '🇦🇷', name: 'Argentina' },
-  { dial_code: '+55', flag: '🇧🇷', name: 'Brazil' },
+  { dial_code: '+55', flag: '🇧🇷', name: 'Brasil' },
   { dial_code: '+56', flag: '🇨🇱', name: 'Chile' },
   { dial_code: '+57', flag: '🇨🇴', name: 'Colombia' },
   { dial_code: '+58', flag: '🇻🇪', name: 'Venezuela' },
@@ -23,15 +36,15 @@ const countryDataList = [
   { dial_code: '+504', flag: '🇭🇳', name: 'Honduras' },
   { dial_code: '+505', flag: '🇳🇮', name: 'Nicaragua' },
   { dial_code: '+506', flag: '🇨🇷', name: 'Costa Rica' },
-  { dial_code: '+507', flag: '🇵🇦', name: 'Panama' },
-  { dial_code: '+509', flag: '🇭🇹', name: 'Haiti' },
+  { dial_code: '+507', flag: '🇵🇦', name: 'Panamá' },
+  { dial_code: '+509', flag: '🇭🇹', name: 'Haití' },
   { dial_code: '+592', flag: '🇬🇾', name: 'Guyana' },
   { dial_code: '+593', flag: '🇪🇨', name: 'Ecuador' },
-  { dial_code: '+594', flag: '🇬🇫', name: 'French Guiana' },
+  { dial_code: '+594', flag: '🇬🇫', name: 'Guayana Francesa' },
   { dial_code: '+595', flag: '🇵🇾', name: 'Paraguay' },
-  { dial_code: '+597', flag: '🇸🇷', name: 'Suriname' },
+  { dial_code: '+597', flag: '🇸🇷', name: 'Surinam' },
   { dial_code: '+598', flag: '🇺🇾', name: 'Uruguay' },
-  { dial_code: '+34', flag: '🇪🇸', name: 'Spain' },
+  { dial_code: '+34', flag: '🇪🇸', name: 'España' },
 ];
 
 // Mapa de código de país (ISO) a dial_code
@@ -96,9 +109,14 @@ const ProfileScreen = ({ navigation }) => {
           setInitialLoginCode(savedProfile.loginCode);
 
           // Usa el codigoPais guardado
-          const countryData = countryDataList.find(country => country.dial_code === savedProfile.codigoPais);
+          const countryData = countryDataList.find(
+            country => country.dial_code === savedProfile.codigoPais
+          );
           if (countryData) {
-            setSelectedCountry({ flag: countryData.flag, dial_code: savedProfile.codigoPais });
+            setSelectedCountry({
+              flag: countryData.flag,
+              dial_code: savedProfile.codigoPais,
+            });
           }
 
           setFirstTime(false);
@@ -106,7 +124,9 @@ const ProfileScreen = ({ navigation }) => {
           // No existe perfil guardado, usar región del dispositivo
           const deviceCountry = RNLocalize.getCountry(); // Ej: "PE"
           const dialCode = countryCodeMap[deviceCountry] || '+51'; // Si no se encuentra el país, usar '+51'
-          const countryData = countryDataList.find(country => country.dial_code === dialCode);
+          const countryData = countryDataList.find(
+            country => country.dial_code === dialCode
+          );
           if (countryData) {
             setSelectedCountry({ flag: countryData.flag, dial_code: dialCode });
             handleChange('codigoPais', dialCode);
@@ -151,7 +171,10 @@ const ProfileScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('Error al verificar autenticación biométrica:', error);
-      showCustomAlert('Error', 'Autenticación biométrica no disponible en este dispositivo o no se completó.');
+      showCustomAlert(
+        'Error',
+        'Autenticación biométrica no disponible en este dispositivo o no se completó.'
+      );
       setProfile(prev => ({ ...prev, biometricsEnabled: false }));
     }
   };
@@ -191,7 +214,9 @@ const ProfileScreen = ({ navigation }) => {
     try {
       const currentDate = new Date();
       const startDate = currentDate.toISOString().split('T')[0];
-      const endDate = new Date(currentDate.setMonth(currentDate.getMonth() + 6)).toISOString().split('T')[0];
+      const endDate = new Date(currentDate.setMonth(currentDate.getMonth() + 6))
+        .toISOString()
+        .split('T')[0];
 
       const datosPerfil = {
         a: firstTime ? 'I' : 'U',
@@ -220,13 +245,24 @@ const ProfileScreen = ({ navigation }) => {
 
       const result = await response.json();
       if (response.ok && result.success === true) {
-        const updatedProfile = { ...profile, clienteId: result.cliente_id || profile.clienteId, fec_ini: startDate, fec_fin: endDate, codigoPais: selectedCountry.dial_code };
+        const updatedProfile = {
+          ...profile,
+          clienteId: result.cliente_id || profile.clienteId,
+          fec_ini: startDate,
+          fec_fin: endDate,
+          codigoPais: selectedCountry.dial_code
+        };
         setProfile(updatedProfile);
+
         await RNFS.writeFile(profilePath, JSON.stringify({ perfilUsuario: updatedProfile }), 'utf8');
+
         const tokenChanged = initialLoginCode !== profile.loginCode;
         showCustomAlert('Éxito', 'Tu perfil ha sido guardado exitosamente.', tokenChanged ? profile.loginCode : '');
       } else if (result.message && result.message.toLowerCase().includes('correo ya registrado')) {
-        showCustomAlert('Cuenta existente', 'El correo ya está registrado. Inicie sesión o use otro correo.');
+        showCustomAlert(
+          'Cuenta existente',
+          'El correo ya está registrado. Inicie sesión o use otro correo.'
+        );
       } else {
         showCustomAlert('Error', 'Hubo un problema al registrar el usuario.');
       }
@@ -241,7 +277,9 @@ const ProfileScreen = ({ navigation }) => {
     setProfile(prev => ({ ...prev, [key]: value }));
   };
 
-  const validateEmail = (email) => /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(email);
+  const validateEmail = (email) => {
+    return /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(email);
+  };
 
   const validateTelefono = (telefono) => {
     if (telefono.length !== 9) {
@@ -274,26 +312,46 @@ const ProfileScreen = ({ navigation }) => {
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
       <ScrollView contentContainerStyle={styles.scrollContainer}>
-        <Image source={profile.profileImage ? { uri: profile.profileImage } : require('../src/presentation/assets/Logo.jpg')} style={styles.profileImage} />
+        <Image
+          source={
+            profile.profileImage
+              ? { uri: profile.profileImage }
+              : require('../src/presentation/assets/Logo.jpg')
+          }
+          style={styles.profileImage}
+        />
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Nombre</Text>
-          <TextInput style={styles.input} placeholder="Nombre" value={profile.name} onChangeText={(text) => handleChange('name', text)} />
+          <TextInput
+            style={styles.input}
+            placeholder="Nombre"
+            value={profile.name}
+            onChangeText={(text) => handleChange('name', text)}
+          />
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Correo</Text>
-          <TextInput style={styles.input} placeholder="Correo" value={profile.correo} onChangeText={(text) => handleChange('correo', text)} keyboardType="email-address" />
+          <TextInput
+            style={styles.input}
+            placeholder="Correo"
+            value={profile.correo}
+            onChangeText={(text) => handleChange('correo', text)}
+            keyboardType="email-address"
+          />
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Teléfono</Text>
           <View style={styles.phoneInputContainer}>
-            <TouchableOpacity 
-              style={[styles.countryCodeButton, { backgroundColor: '#fff', borderColor: '#165bbd' }]} 
+            <TouchableOpacity
+              style={[styles.countryCodeButton, { backgroundColor: '#fff', borderColor: '#165bbd' }]}
               onPress={() => setShowCountryPicker(true)}
             >
-              <Text style={styles.countryCodeText}>{selectedCountry.flag} {selectedCountry.dial_code}</Text>
+              <Text style={styles.countryCodeText}>
+                {selectedCountry.flag} {selectedCountry.dial_code}
+              </Text>
             </TouchableOpacity>
             <TextInput
               style={styles.phoneInput}
@@ -308,15 +366,27 @@ const ProfileScreen = ({ navigation }) => {
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Código de acceso</Text>
-          <TextInput style={styles.input} placeholder="Código de acceso" value={profile.loginCode} onChangeText={(text) => handleChange('loginCode', text)} keyboardType="numeric" maxLength={4} />
+          <TextInput
+            style={styles.input}
+            placeholder="Código de acceso"
+            value={profile.loginCode}
+            onChangeText={(text) => handleChange('loginCode', text)}
+            keyboardType="numeric"
+            maxLength={4}
+          />
         </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Ciudad</Text>
-          <TextInput style={styles.input} placeholder="Ciudad" value={profile.ciudad} onChangeText={(text) => handleChange('ciudad', text)} />
+          <TextInput
+            style={styles.input}
+            placeholder="Ciudad"
+            value={profile.ciudad}
+            onChangeText={(text) => handleChange('ciudad', text)}
+          />
         </View>
 
-        <View style={styles.inputContainer}> 
+        <View style={styles.inputContainer}>
           <View style={styles.switchContainer}>
             <Text style={styles.label}>Habilitar autenticación biométrica</Text>
             <Switch
@@ -334,7 +404,12 @@ const ProfileScreen = ({ navigation }) => {
             onValueChange={() => handleChange('termsAccepted', !profile.termsAccepted)}
             tintColors={{ true: '#155abd', false: '#767577' }}
           />
-          <Text style={styles.termsText} onPress={() => Linking.openURL('https://solucionestecperu.com/soporte/')}>Acepto los <Text style={styles.linkText}>términos y condiciones</Text></Text>
+          <Text
+            style={styles.termsText}
+            onPress={() => Linking.openURL('https://solucionestecperu.com/soporte/')}
+          >
+            Acepto los <Text style={styles.linkText}>términos y condiciones</Text>
+          </Text>
         </View>
 
         <TouchableOpacity style={styles.button} onPress={handleSaveProfile}>
@@ -351,7 +426,10 @@ const ProfileScreen = ({ navigation }) => {
         <TouchableWithoutFeedback onPress={() => setShowCountryPicker(false)}>
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setShowCountryPicker(false)}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowCountryPicker(false)}
+              >
                 <Icon name="close" size={24} color="#000" />
               </TouchableOpacity>
               <ScrollView>
@@ -365,7 +443,9 @@ const ProfileScreen = ({ navigation }) => {
                       setShowCountryPicker(false);
                     }}
                   >
-                    <Text style={styles.countryText}>{country.flag} {country.name} ({country.dial_code})</Text>
+                    <Text style={styles.countryText}>
+                      {country.flag} {country.name} ({country.dial_code})
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
@@ -374,7 +454,14 @@ const ProfileScreen = ({ navigation }) => {
         </TouchableWithoutFeedback>
       </Modal>
 
-      <CustomAlert visible={alertVisible} title={alertData.title} message={alertData.message} token={alertData.token} onClose={() => setAlertVisible(false)} onAccept={onAcceptAlert} />
+      <CustomAlert
+        visible={alertVisible}
+        title={alertData.title}
+        message={alertData.message}
+        token={alertData.token}
+        onClose={() => setAlertVisible(false)}
+        onAccept={onAcceptAlert}
+      />
     </KeyboardAvoidingView>
   );
 };
@@ -382,10 +469,26 @@ const ProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
   scrollContainer: { padding: 20, alignItems: 'center' },
-  profileImage: { width: 120, height: 120, borderRadius: 60, borderColor: '#165bbd', borderWidth: 3, alignSelf: 'center', marginBottom: 20 },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    borderColor: '#165bbd',
+    borderWidth: 3,
+    alignSelf: 'center',
+    marginBottom: 20
+  },
   inputContainer: { width: '100%', marginBottom: 15 },
   label: { fontSize: 16, color: '#333', marginBottom: 5, fontWeight: '500' },
-  input: { color: '#333', padding: 12, backgroundColor: '#fff', borderRadius: 8, borderColor: '#ccc', borderWidth: 1, fontSize: 16 },
+  input: {
+    color: '#333',
+    padding: 12,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    borderColor: '#ccc',
+    borderWidth: 1,
+    fontSize: 16
+  },
   phoneInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -415,15 +518,41 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     fontSize: 16,
   },
-  button: { backgroundColor: '#155abd', paddingVertical: 15, borderRadius: 8, alignItems: 'center', width: '100%', marginTop: 20 },
+  button: {
+    backgroundColor: '#155abd',
+    paddingVertical: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    width: '100%',
+    marginTop: 20
+  },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   errorText: { color: 'red', fontSize: 14, marginTop: 5 },
-  modalOverlay: { flex: 1, justifyContent: 'center', backgroundColor: 'rgba(0, 0, 0, 0.5)' },
-  modalContent: { margin: 20, backgroundColor: 'white', borderRadius: 10, padding: 10, alignItems: 'center' },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)'
+  },
+  modalContent: {
+    margin: 20,
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 10,
+    alignItems: 'center'
+  },
   closeButton: { alignSelf: 'flex-end', marginBottom: 10 },
-  countryItem: { paddingVertical: 15, paddingHorizontal: 20, borderBottomColor: '#ccc', borderBottomWidth: 1 },
+  countryItem: {
+    paddingVertical: 15,
+    paddingHorizontal: 20,
+    borderBottomColor: '#ccc',
+    borderBottomWidth: 1
+  },
   countryText: { fontSize: 16, color: '#333' },
-  termsContainer: { flexDirection: 'row', alignItems: 'center', marginBottom: 20 },
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 20
+  },
   termsText: { marginLeft: 10, color: '#333', fontSize: 16 },
   linkText: { color: '#155abd', textDecorationLine: 'underline' },
   switchContainer: {

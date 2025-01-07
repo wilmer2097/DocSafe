@@ -135,11 +135,6 @@ const HomeScreen = () => {
     showCustomAlert('Información', 'Funcionalidad de compartir no implementada.');
   };
 
-  const handleProfileSave = (updatedProfile) => {
-    setProfile(updatedProfile);
-    loadProfile();
-  };
-
   const navigateToDocumentDetail = (document) => {
     navigation.navigate('DocumentDetail', {
       document,

@@ -10,8 +10,10 @@ import {
   StyleSheet, 
   ScrollView, 
   Modal, 
-  Platform 
+  Platform ,
+  Keyboard 
 } from 'react-native';
+import { openDocument } from './utils';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import DocumentPicker from 'react-native-document-picker';
 import ImageCropPicker from 'react-native-image-crop-picker';
@@ -40,7 +42,8 @@ import {
   faFile
 } from '@fortawesome/free-solid-svg-icons';
 
-import CustomImageViewer from './CustomImageViewer'; 
+import ImageViewing from 'react-native-image-viewing';
+
 import CustomAlert from './CustomAlert';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
@@ -58,6 +61,10 @@ const generateUniqueFilename = (extension = '.jpg') => {
 };
 
 const getIconForFileType = (fileName) => {
+  if (!fileName || typeof fileName !== 'string') {
+    console.error('Nombre de archivo no válido:', fileName);
+    return { icon: faFileAlt, color: '#6c757d' }; // Ícono genérico
+  }
   const extension = fileName.split('.').pop().toLowerCase();
   switch (extension) {
     case 'pdf':
@@ -85,9 +92,10 @@ const getIconForFileType = (fileName) => {
     case 'wav':
       return { icon: faFileAudio, color: '#8e44ad' };
     default:
-      return { icon: faFileAlt, color: '#6c757d' };  // Ícono genérico
+      return { icon: faFileAlt, color: '#6c757d' }; // Ícono genérico
   }
 };
+
 
 const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   const [principalDocument, setPrincipalDocument] = useState(null);
@@ -108,6 +116,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   const [alertConfig, setAlertConfig] = useState({});
   const [editingFileIndex, setEditingFileIndex] = useState(null);
   const [isPicking, setIsPicking] = useState(false);
+  const [viewerVisible, setViewerVisible] = useState(false);
 
   const documentNameRef = useRef(null);
   const descriptionRef = useRef(null);
@@ -164,7 +173,10 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
     console.log('[handleActionSheetPress] Opción elegida:', option);
     // Cierra el modal
     setIsActionSheetVisible(false);
-
+    documentNameRef.current?.blur();
+    descriptionRef.current?.blur();
+    urTextlRef.current?.blur();
+    Keyboard.dismiss();
     // Espera 500 ms antes de abrir la galería/cámara/archivos
     setTimeout(async () => {
       console.log('[handleActionSheetPress -> setTimeout] Iniciando...');
@@ -208,6 +220,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
     documentNameRef.current?.blur();
     descriptionRef.current?.blur();
     urTextlRef.current?.blur();
+    Keyboard.dismiss();
 
     try {
       const imagen = await ImageCropPicker.openCamera({
@@ -258,6 +271,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
     }
     setIsPicking(true);
 
+
     documentNameRef.current?.blur();
     descriptionRef.current?.blur();
     urTextlRef.current?.blur();
@@ -307,46 +321,53 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
 
   const abrirSelectorDocumentos = async (tipo) => {
     console.log('[abrirSelectorDocumentos] Inicio. isPicking:', isPicking);
+  
     if (isPicking) {
-      console.log('[abrirSelectorDocumentos] Bloqueado por isPicking.');
+      console.log('[abrirSelectorDocumentos] Operación bloqueada porque isPicking está activo.');
       return;
     }
+  
     setIsPicking(true);
-
+  
+    // Cerrar cualquier input activo
     documentNameRef.current?.blur();
     descriptionRef.current?.blur();
     urTextlRef.current?.blur();
-
+  
     try {
+      console.log('[abrirSelectorDocumentos] Abriendo selector de documentos...');
       const resultado = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
+  
       if (resultado && resultado[0]) {
         const archivo = resultado[0];
-        
-        // Si quieres extraer la extensión real, haz algo como:
-        // const ext = archivo.name ? `.${archivo.name.split('.').pop()}` : '.dat';
-        // Para simplicidad, aquí usamos .dat:
-        const uniqueName = generateUniqueFilename('.dat');
-
+        console.log('[abrirSelectorDocumentos] Archivo seleccionado:', archivo);
+  
+        // Extraer extensión real del archivo o asignar .dat si no existe
+        const extension = archivo.name ? `.${archivo.name.split('.').pop().toLowerCase()}` : '.dat';
+        const uniqueName = generateUniqueFilename(extension);
+  
+        const archivoProcesado = {
+          uri: archivo.uri,
+          name: uniqueName,
+          type: archivo.type || 'application/octet-stream', // Tipo MIME genérico si no está definido
+        };
+  
+        // Asignar archivo al tipo correspondiente
         if (tipo === 'principal') {
-          setPrincipalDocument({
-            uri: archivo.uri,
-            name: uniqueName,
-            type: archivo.type
-          });
+          setPrincipalDocument(archivoProcesado);
         } else if (tipo === 'secondary') {
-          setSecondaryDocument({
-            uri: archivo.uri,
-            name: uniqueName,
-            type: archivo.type
-          });
+          setSecondaryDocument(archivoProcesado);
         }
-        console.log('[abrirSelectorDocumentos] Archivo seleccionado con nombre único:', uniqueName);
+  
+        console.log('[abrirSelectorDocumentos] Archivo procesado y asignado:', archivoProcesado);
+      } else {
+        console.warn('[abrirSelectorDocumentos] No se seleccionó ningún archivo.');
       }
     } catch (error) {
       if (DocumentPicker.isCancel(error)) {
-        console.log('[abrirSelectorDocumentos] Usuario canceló el selector de documentos');
+        console.log('[abrirSelectorDocumentos] Usuario canceló el selector de documentos.');
       } else {
-        console.error('Error seleccionando archivo:', error);
+        console.error('[abrirSelectorDocumentos] Error al seleccionar documento:', error);
         Alert.alert('Error', `No se pudo seleccionar el documento: ${error.message || error}`);
       }
     } finally {
@@ -354,17 +375,48 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       console.log('[abrirSelectorDocumentos] Fin. isPicking:', isPicking);
     }
   };
+  
 
   // ------------------------------
   // Manejo de archivos (eliminar, visualizar)
   // ------------------------------
-  const handleFilePress = (file, index) => {
-    const isImage = file?.type?.startsWith('image/');
-    if (isImage) {
-      setCurrentImageUri(index);
-      setIsImageViewerVisible(true);
+  // Al pulsar la imagen:
+  const handleFilePress = async (file, index) => {
+    const isImage = /\.(jpg|jpeg|png)$/i.test(file?.name || ''); // Verifica si es una imagen
+    const persistentPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${file.name}`; // Ruta persistente esperada
+  
+    try {
+      // Si es una imagen, abre el visor
+      if (isImage) {
+        setCurrentImageUri(index);
+        setViewerVisible(true);
+        return;
+      }
+  
+      // Verifica si el archivo existe en la ubicación persistente
+      const fileExists = await RNFS.exists(persistentPath);
+  
+      if (!fileExists) {
+        // Copia el archivo a una ubicación persistente si no existe
+        console.log('[handleFilePress] Archivo no encontrado en persistente, copiando...');
+        await RNFS.copyFile(file.uri, persistentPath);
+      }
+  
+      // Abre el archivo usando openDocument
+      const mimeType = file?.type || '*/*'; // Obtén el tipo MIME
+      openDocument(persistentPath, mimeType);
+    } catch (error) {
+      console.error('Error al abrir o copiar el archivo:', error);
+      showCustomAlert('Error', 'No se pudo abrir el archivo. Asegúrate de que el archivo exista.');
     }
   };
+  
+  
+    // Array con las URIs de las imágenes (principal y secundaria)
+    const images = [
+      principalDocument && { uri: principalDocument.uri },
+      secondaryDocument && { uri: secondaryDocument.uri }
+    ].filter(Boolean);
 
   const deleteFile = (fileType) => {
     console.log('[deleteFile] Eliminando archivo:', fileType);
@@ -376,22 +428,22 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   };
 
   const renderDocumentFile = (file, fileType, index) => {
-    if (!file) {
+    if (!file || !file.name) {
       return renderAddFileIcon(
         fileType === 'principal' ? 'Principal/Anverso' : 'Secundario/Reverso'
       );
     }
-    const { icon, color } = getIconForFileType(file.name);
-    const isImage = file?.type?.startsWith('image/');
-
+  
+    const { icon, color } = getIconForFileType(file.name); // Obtén el ícono según el tipo de archivo
+  
     return (
       <View key={`${fileType}-${index}`} style={styles.documentSection}>
         <Text style={styles.sectionLabel}>
           {fileType === 'principal' ? 'Principal/Anverso' : 'Secundario/Reverso'}
         </Text>
         <TouchableOpacity onPress={() => handleFilePress(file, index)} style={styles.fileContainer}>
-          {isImage ? (
-            <Image source={{ uri: file.uri }} style={styles.filePreview} /> 
+          {/\.(jpg|jpeg|png)$/i.test(file.name) ? (
+            <Image source={{ uri: file.uri }} style={styles.filePreview} />
           ) : (
             <FontAwesomeIcon icon={icon} size={50} color={color} />
           )}
@@ -399,8 +451,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
         <View style={styles.iconActions}>
           <TouchableOpacity
             onPress={() => {
-              // Abrir ActionSheet
-              setFileType(index === 0 ? 'principal' : 'secondary');
+              setFileType(fileType);
               setEditingFileIndex(index);
               setIsActionSheetVisible(true);
             }}
@@ -415,6 +466,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       </View>
     );
   };
+  
 
   const renderAddFileIcon = (label) => (
     <View key={label} style={styles.documentSection}>
@@ -682,24 +734,18 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
           </View>
         </View>
       </Modal>
+      <ImageViewing
+  images={images} // Asegúrate de que `images` sea un array de objetos con la clave `uri`
+  imageIndex={currentImageUri} // Índice de la imagen inicial
+  visible={viewerVisible} // Controla la visibilidad
+  onRequestClose={() => setViewerVisible(false)} // Cierra el visor
+  FooterComponent={({ imageIndex }) => (
+    <TouchableOpacity onPress={() => handleShare(imageIndex)} style={styles.footerContainer}>
+      <FontAwesomeIcon icon={faShareAlt} size={24} color="#fff" />
+    </TouchableOpacity>
+  )}
+/>
 
-      {/* Modal para visor de imágenes */}
-      <Modal
-        visible={isImageViewerVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setIsImageViewerVisible(false)}
-      >
-        <CustomImageViewer
-          visible={isImageViewerVisible}
-          images={[
-            principalDocument && { uri: principalDocument.uri },
-            secondaryDocument && { uri: secondaryDocument?.uri }
-          ].filter(Boolean)}
-          initialIndex={currentImageUri}
-          onClose={() => setIsImageViewerVisible(false)}
-        />
-      </Modal>
     </ScrollView>
   );
 };
@@ -708,6 +754,12 @@ const styles = StyleSheet.create({
   container: {
     padding: 20,
     backgroundColor: '#f5f5f5',
+  },
+  footerContainer: {
+    position: 'absolute',
+    bottom: 40,
+    right: 20,
+    zIndex: 99,
   },
   modalContainer: {
     flex: 1,

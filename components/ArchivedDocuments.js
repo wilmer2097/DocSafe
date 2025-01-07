@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { View, FlatList, Alert, TouchableOpacity, Text, Linking } from 'react-native';
+import { View, FlatList, Alert, TouchableOpacity, Text, Linking,  Keyboard  } from 'react-native';
 import RNFS from 'react-native-fs';
 import DocumentItem from './DocumentItem';
 import { useFocusEffect } from '@react-navigation/native';
