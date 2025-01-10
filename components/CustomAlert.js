@@ -1,7 +1,16 @@
 import React from 'react';
 import { Modal, View, Text, Pressable, StyleSheet } from 'react-native';
 
-const CustomAlert = ({ visible, onClose, title, message, token, onAccept }) => {
+const CustomAlert = ({ 
+  visible, 
+  onClose, 
+  title, 
+  message, 
+  token, 
+  onAccept,
+  showCancel = false, 
+  onCancel // Nuevo callback para Cancelar
+}) => {
   return (
     <Modal
       visible={visible}
@@ -23,9 +32,31 @@ const CustomAlert = ({ visible, onClose, title, message, token, onAccept }) => {
             </>
           ) : null}
 
-          <Pressable style={styles.button} onPress={() => { onAccept(); onClose(); }}>
-            <Text style={styles.buttonText}>Aceptar</Text>
-          </Pressable>
+          {/* Botones: si showCancel es true, mostramos ambos */}
+          <View style={styles.buttonRow}>
+          <Pressable 
+              style={styles.button} 
+              onPress={() => { 
+                onAccept(); 
+                onClose(); 
+              }}
+            >
+              <Text style={styles.buttonText}>Aceptar</Text>
+            </Pressable>
+            {showCancel && (
+              <Pressable 
+                style={[styles.button, styles.cancelButton]} 
+                onPress={() => {
+                  onClose();
+                  if (onCancel) onCancel();
+                }}
+              >
+                <Text style={styles.buttonText}>Cancelar</Text>
+              </Pressable>
+            )}
+
+            
+          </View>
         </View>
       </Pressable>
     </Modal>
@@ -84,12 +115,21 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     letterSpacing: 2,
   },
+  buttonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+  },
   button: {
     backgroundColor: '#155abd',
     paddingVertical: 12,
     paddingHorizontal: 25,
     borderRadius: 10,
     alignItems: 'center',
+    marginTop: 10,
+    minWidth: 100,
+  },
+  cancelButton: {
+    backgroundColor: '#cc0000',
   },
   buttonText: {
     color: '#fff',

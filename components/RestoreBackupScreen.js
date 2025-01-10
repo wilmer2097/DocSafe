@@ -29,7 +29,6 @@ const RestoreBackupScreen = () => {
 
   // Rutas base
   const backupFolder = `${RNFS.DocumentDirectoryPath}/DocSafeBackups`;
-  const backupFilePath = `${backupFolder}/backup_docsafe.zip`; // Al crear backups
   const docsPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
   const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
   const archivosDataPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
@@ -46,11 +45,16 @@ const RestoreBackupScreen = () => {
         await RNFS.mkdir(backupFolder);
       }
 
-      // Si existe un backup previo con el mismo nombre, se elimina
-      const fileExists = await RNFS.exists(backupFilePath);
-      if (fileExists) {
-        await RNFS.unlink(backupFilePath);
-      }
+      // Generar un nombre único para el archivo ZIP
+      const timestamp = new Date().toISOString().replace(/[^\d]/g, '');
+      const backupFilePath = `${backupFolder}/backup_created_${timestamp}.zip`;
+
+      // Si existiera un backup con el mismo nombre (casi imposible con timestamp),
+      // podrías eliminarlo, pero normalmente no hará falta.
+      // const fileExists = await RNFS.exists(backupFilePath);
+      // if (fileExists) {
+      //   await RNFS.unlink(backupFilePath);
+      // }
 
       // Zipear archivos
       const filesToZip = [docsPath, profilePath, archivosDataPath];
@@ -90,24 +94,17 @@ const RestoreBackupScreen = () => {
           await RNFS.mkdir(backupFolder);
         }
 
-        // Ruta local donde guardaremos el ZIP cargado
-        const localZipPath = `${backupFolder}/backup_docsafe.zip`;
-
-        // Si ya existe un ZIP con este nombre, lo borramos para sobrescribir
-        const fileExists = await RNFS.exists(localZipPath);
-        if (fileExists) {
-          await RNFS.unlink(localZipPath);
-        }
+        // Generar un nombre único para el archivo ZIP cargado
+        const timestamp = new Date().toISOString().replace(/[^\d]/g, '');
+        const localZipPath = `${backupFolder}/backup_loaded_${timestamp}.zip`;
 
         // Copiar el archivo seleccionado a la carpeta interna
         const sourcePath = pickedZipUri.replace('file://', '');
         await RNFS.copyFile(sourcePath, localZipPath);
 
-        // ------------ Ejemplo de restauración inmediata -------------
-        //     (descomprimir y mover .json a /assets)
-        // Nota: Esto lo hacemos para demostrar que se cargó correctamente.
-        // Si prefieres restaurar solo con el botón "faUndo", puedes
-        // comentar la sección de descompresión.
+        // ------------- Ejemplo de restauración inmediata -------------
+        // Descomprimir y mover .json a /assets, solo para demostrar.
+        // Podrías quitarlo si quieres restaurar solo cuando uses "faUndo".
         const tempZipPath = `${RNFS.TemporaryDirectoryPath}/backup_temp.zip`;
         await RNFS.copyFile(localZipPath, tempZipPath);
 
@@ -243,9 +240,14 @@ const RestoreBackupScreen = () => {
   // ---------------------------------------------------
   const renderBackupItem = (backup, label) => (
     <View style={styles.backupItem}>
-      <Text style={styles.backupName}>
+      <Text
+        style={styles.backupName}
+        numberOfLines={1}
+        ellipsizeMode="tail"
+      >
         {label}: {backup?.name || ''}
       </Text>
+
       <View style={styles.buttonGroup}>
         {/* Botón para compartir */}
         <TouchableOpacity
@@ -331,7 +333,7 @@ const RestoreBackupScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: 10,
     backgroundColor: '#f0f0f0',
     justifyContent: 'center',
     alignItems: 'center',
@@ -403,12 +405,17 @@ const styles = StyleSheet.create({
     shadowRadius: 2.22,
   },
   backupName: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#185abd',
     fontWeight: 'bold',
+    flex: 1,
+    marginRight: 10,
+    overflow: 'hidden',
   },
   buttonGroup: {
     flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
   },
   iconButton: {
     padding: 10,

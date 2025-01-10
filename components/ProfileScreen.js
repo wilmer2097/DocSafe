@@ -16,10 +16,11 @@ import {
 import RNFS from 'react-native-fs';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import CustomAlert from './CustomAlert';
-import Icon from 'react-native-vector-icons/FontAwesome';
+import {
+  FontAwesomeIcon
+} from '@fortawesome/react-native-fontawesome';
+import {faTimes} from '@fortawesome/free-solid-svg-icons';
 import CheckBox from '@react-native-community/checkbox';
-
-// Importar react-native-localize
 import * as RNLocalize from 'react-native-localize';
 
 const countryDataList = [
@@ -87,7 +88,7 @@ const ProfileScreen = ({ navigation }) => {
     fec_fin: '',
     termsAccepted: false,
   });
-  const [email, setEmail] = useState('');
+
   const [firstTime, setFirstTime] = useState(true);
   const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
   const [errorTelefono, setErrorTelefono] = useState(null);
@@ -123,7 +124,7 @@ const ProfileScreen = ({ navigation }) => {
         } else {
           // No existe perfil guardado, usar región del dispositivo
           const deviceCountry = RNLocalize.getCountry(); // Ej: "PE"
-          const dialCode = countryCodeMap[deviceCountry] || '+51'; // Si no se encuentra el país, usar '+51'
+          const dialCode = countryCodeMap[deviceCountry] || '+51'; 
           const countryData = countryDataList.find(
             country => country.dial_code === dialCode
           );
@@ -150,15 +151,24 @@ const ProfileScreen = ({ navigation }) => {
     setAlertVisible(true);
   };
 
+  // Ajustado: Solo usamos .toLowerCase() en los campos string donde sea necesario
+  const handleChange = (key, value) => {
+    // Campos que SÍ queremos convertir a minúsculas
+    if (['correo', 'name', 'ciudad'].includes(key) && typeof value === 'string') {
+      setProfile(prev => ({ ...prev, [key]: value.toLowerCase() }));
+    } else {
+      // Para teléfono, loginCode, booleans (checkbox, switch), etc.
+      setProfile(prev => ({ ...prev, [key]: value }));
+    }
+  };
+
   const toggleBiometrics = async (enabled) => {
     const rnBiometrics = new ReactNativeBiometrics();
-
     try {
       if (enabled) {
         const { success } = await rnBiometrics.simplePrompt({
           promptMessage: 'Confirma tu identidad para habilitar la autenticación biométrica',
         });
-
         if (success) {
           setProfile(prev => ({ ...prev, biometricsEnabled: true }));
           showCustomAlert('', 'Autenticación biométrica habilitada.');
@@ -182,11 +192,11 @@ const ProfileScreen = ({ navigation }) => {
   const handleSaveProfile = async () => {
     if (isSubmitting) return;
 
+    // Validar Términos
     if (!profile.termsAccepted) {
       showCustomAlert('Error', 'Debes aceptar los términos y condiciones para continuar.');
       return;
     }
-
     setIsSubmitting(true);
 
     if (!profile.name.trim()) {
@@ -195,7 +205,8 @@ const ProfileScreen = ({ navigation }) => {
       return;
     }
 
-    profile.correo = profile.correo.toLowerCase();
+    // Ya no necesitamos profile.correo = profile.correo.toLowerCase();
+    // pues handleChange lo hace si es un string.
 
     if (!validateEmail(profile.correo)) {
       showCustomAlert('Error', 'Por favor ingresa un correo electrónico válido.');
@@ -252,7 +263,7 @@ const ProfileScreen = ({ navigation }) => {
           clienteId: result.cliente_id || profile.clienteId,
           fec_ini: startDate,
           fec_fin: endDate,
-          codigoPais: selectedCountry.dial_code
+          codigoPais: selectedCountry.dial_code,
         };
         setProfile(updatedProfile);
 
@@ -274,12 +285,6 @@ const ProfileScreen = ({ navigation }) => {
       setIsSubmitting(false);
     }
   };
-
-  const handleChange = (key, value) => {
-    setProfile(prev => ({ ...prev, [key]: value.toLowerCase() }));
-  };
-  
-  
 
   const validateEmail = (email) => {
     return /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(email);
@@ -335,17 +340,18 @@ const ProfileScreen = ({ navigation }) => {
           />
         </View>
 
+        {/* Unificamos el correo con handleChange */}
         <View style={styles.inputContainer}>
-        <Text style={styles.label}>Correo</Text>
-        <TextInput
-        style={styles.input}
-        placeholder="Correo electrónico"
-        value={profile.correo}
-        onChangeText={(text) => setEmail(text)}
-        keyboardType="email-address"
-        placeholderTextColor="#999"
-      />
-      </View>
+          <Text style={styles.label}>Correo</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Correo electrónico"
+            value={profile.correo}
+            onChangeText={(text) => handleChange('correo', text)}
+            keyboardType="email-address"
+            placeholderTextColor="#999"
+          />
+        </View>
 
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Teléfono</Text>
@@ -403,6 +409,7 @@ const ProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
+        {/* Checkbox de términos, usando handleChange para no llamar toLowerCase */}
         <View style={styles.termsContainer}>
           <CheckBox
             value={profile.termsAccepted}
@@ -435,7 +442,7 @@ const ProfileScreen = ({ navigation }) => {
                 style={styles.closeButton}
                 onPress={() => setShowCountryPicker(false)}
               >
-                <Icon name="close" size={24} color="#000" />
+                <FontAwesomeIcon icon={faTimes} size={20} color="#000" />
               </TouchableOpacity>
               <ScrollView>
                 {countryDataList.map((country, index) => (
@@ -481,7 +488,7 @@ const styles = StyleSheet.create({
     borderColor: '#165bbd',
     borderWidth: 3,
     alignSelf: 'center',
-    marginBottom: 20
+    marginBottom: 20,
   },
   inputContainer: { width: '100%', marginBottom: 15 },
   label: { fontSize: 16, color: '#333', marginBottom: 5, fontWeight: '500' },
@@ -492,7 +499,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderColor: '#ccc',
     borderWidth: 1,
-    fontSize: 16
+    fontSize: 16,
   },
   phoneInputContainer: {
     flexDirection: 'row',
@@ -529,34 +536,34 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     width: '100%',
-    marginTop: 20
+    marginTop: 20,
   },
   buttonText: { color: '#fff', fontSize: 18, fontWeight: '600' },
   errorText: { color: 'red', fontSize: 14, marginTop: 5 },
   modalOverlay: {
     flex: 1,
     justifyContent: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)'
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   modalContent: {
     margin: 20,
     backgroundColor: 'white',
     borderRadius: 10,
     padding: 10,
-    alignItems: 'center'
+    alignItems: 'center',
   },
   closeButton: { alignSelf: 'flex-end', marginBottom: 10 },
   countryItem: {
     paddingVertical: 15,
-    paddingHorizontal: 20,
+    paddingHorizontal: 10,
     borderBottomColor: '#ccc',
-    borderBottomWidth: 1
+    borderBottomWidth: 1,
   },
   countryText: { fontSize: 16, color: '#333' },
   termsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20
+    marginBottom: 20,
   },
   termsText: { marginLeft: 10, color: '#333', fontSize: 16 },
   linkText: { color: '#155abd', textDecorationLine: 'underline' },

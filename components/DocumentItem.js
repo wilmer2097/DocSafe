@@ -105,8 +105,6 @@ const DocumentItem = ({ documentName }) => {
         // Verifica que iOS pueda leer las dimensiones (para permitir pinch zoom).
         verifyImagesDimensions(imageUris);
 
-      } else {
-        console.error('Documento no encontrado en archivos JSON');
       }
     } catch (error) {
       console.error('Error cargando datos del documento:', error);
