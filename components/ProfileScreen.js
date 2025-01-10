@@ -16,10 +16,7 @@ import {
 import RNFS from 'react-native-fs';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import CustomAlert from './CustomAlert';
-import {
-  FontAwesomeIcon
-} from '@fortawesome/react-native-fontawesome';
-import {faTimes} from '@fortawesome/free-solid-svg-icons';
+import Icon from 'react-native-vector-icons/FontAwesome';
 import CheckBox from '@react-native-community/checkbox';
 import * as RNLocalize from 'react-native-localize';
 
@@ -124,7 +121,7 @@ const ProfileScreen = ({ navigation }) => {
         } else {
           // No existe perfil guardado, usar región del dispositivo
           const deviceCountry = RNLocalize.getCountry(); // Ej: "PE"
-          const dialCode = countryCodeMap[deviceCountry] || '+51'; 
+          const dialCode = countryCodeMap[deviceCountry] || '+51';
           const countryData = countryDataList.find(
             country => country.dial_code === dialCode
           );
@@ -146,22 +143,21 @@ const ProfileScreen = ({ navigation }) => {
     loadProfile();
   }, []);
 
+  // --------------------------------------------------------------------
+  // handleChange: Asigna el valor tal como está (sin toLowerCase)
+  // --------------------------------------------------------------------
+  const handleChange = (key, value) => {
+    setProfile(prev => ({ ...prev, [key]: value }));
+  };
+
   const showCustomAlert = (title, message, token = '') => {
     setAlertData({ title, message, token });
     setAlertVisible(true);
   };
 
-  // Ajustado: Solo usamos .toLowerCase() en los campos string donde sea necesario
-  const handleChange = (key, value) => {
-    // Campos que SÍ queremos convertir a minúsculas
-    if (['correo', 'name', 'ciudad'].includes(key) && typeof value === 'string') {
-      setProfile(prev => ({ ...prev, [key]: value.toLowerCase() }));
-    } else {
-      // Para teléfono, loginCode, booleans (checkbox, switch), etc.
-      setProfile(prev => ({ ...prev, [key]: value }));
-    }
-  };
-
+  // --------------------------------------------------------------------
+  // toggleBiometrics
+  // --------------------------------------------------------------------
   const toggleBiometrics = async (enabled) => {
     const rnBiometrics = new ReactNativeBiometrics();
     try {
@@ -169,6 +165,7 @@ const ProfileScreen = ({ navigation }) => {
         const { success } = await rnBiometrics.simplePrompt({
           promptMessage: 'Confirma tu identidad para habilitar la autenticación biométrica',
         });
+
         if (success) {
           setProfile(prev => ({ ...prev, biometricsEnabled: true }));
           showCustomAlert('', 'Autenticación biométrica habilitada.');
@@ -189,10 +186,18 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  // --------------------------------------------------------------------
+  // handleSaveProfile: conviertes a minúsculas antes de las validaciones
+  // --------------------------------------------------------------------
   const handleSaveProfile = async () => {
     if (isSubmitting) return;
 
-    // Validar Términos
+    // Convertir a minúsculas solo al guardar
+    if (profile.correo) profile.correo = profile.correo.toLowerCase();
+    if (profile.name) profile.name = profile.name.toLowerCase();
+    if (profile.ciudad) profile.ciudad = profile.ciudad.toLowerCase();
+
+    // Validación de términos
     if (!profile.termsAccepted) {
       showCustomAlert('Error', 'Debes aceptar los términos y condiciones para continuar.');
       return;
@@ -204,9 +209,6 @@ const ProfileScreen = ({ navigation }) => {
       setIsSubmitting(false);
       return;
     }
-
-    // Ya no necesitamos profile.correo = profile.correo.toLowerCase();
-    // pues handleChange lo hace si es un string.
 
     if (!validateEmail(profile.correo)) {
       showCustomAlert('Error', 'Por favor ingresa un correo electrónico válido.');
@@ -263,7 +265,7 @@ const ProfileScreen = ({ navigation }) => {
           clienteId: result.cliente_id || profile.clienteId,
           fec_ini: startDate,
           fec_fin: endDate,
-          codigoPais: selectedCountry.dial_code,
+          codigoPais: selectedCountry.dial_code
         };
         setProfile(updatedProfile);
 
@@ -286,6 +288,9 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  // --------------------------------------------------------------------
+  // Validaciones
+  // --------------------------------------------------------------------
   const validateEmail = (email) => {
     return /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(email);
   };
@@ -318,6 +323,9 @@ const ProfileScreen = ({ navigation }) => {
     }
   };
 
+  // --------------------------------------------------------------------
+  // Render
+  // --------------------------------------------------------------------
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -340,7 +348,6 @@ const ProfileScreen = ({ navigation }) => {
           />
         </View>
 
-        {/* Unificamos el correo con handleChange */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Correo</Text>
           <TextInput
@@ -409,7 +416,6 @@ const ProfileScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Checkbox de términos, usando handleChange para no llamar toLowerCase */}
         <View style={styles.termsContainer}>
           <CheckBox
             value={profile.termsAccepted}
@@ -442,7 +448,7 @@ const ProfileScreen = ({ navigation }) => {
                 style={styles.closeButton}
                 onPress={() => setShowCountryPicker(false)}
               >
-                <FontAwesomeIcon icon={faTimes} size={20} color="#000" />
+                <Icon name="close" size={24} color="#000" />
               </TouchableOpacity>
               <ScrollView>
                 {countryDataList.map((country, index) => (
@@ -555,7 +561,7 @@ const styles = StyleSheet.create({
   closeButton: { alignSelf: 'flex-end', marginBottom: 10 },
   countryItem: {
     paddingVertical: 15,
-    paddingHorizontal: 10,
+    paddingHorizontal: 20,
     borderBottomColor: '#ccc',
     borderBottomWidth: 1,
   },
