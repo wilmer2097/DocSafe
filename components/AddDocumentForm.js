@@ -21,6 +21,7 @@ import RNFS from 'react-native-fs';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
   faSave,
+  faTimes,
   faTimesCircle,
   faCalendarAlt,
   faLink,
@@ -40,8 +41,7 @@ import {
   faFile,
   faShareAlt,
 } from '@fortawesome/free-solid-svg-icons';
-
-import ImageViewing from 'react-native-image-viewing';
+import ImageViewer from 'react-native-image-zoom-viewer';
 import CustomAlert from './CustomAlert';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
@@ -108,7 +108,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   const [description, setDescription] = useState('');
   const [url, setUrl] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
-
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
   // ---- Estados para ImageViewing ----
   const [viewerVisible, setViewerVisible] = useState(false);
   const [currentImageUri, setCurrentImageUri] = useState(0);
@@ -363,22 +363,36 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   // ------------------------------
   // MANEJO DE ARCHIVOS (abrir, eliminar, visor)
   // ------------------------------
-  const handleFilePress = async (file, index) => {
-    const isImage = /\.(jpg|jpeg|png)$/i.test(file?.name || '');
-    const persistentPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${file.name}`;
-
+  const handleFilePress = async (fileType) => {
     try {
+      // Configura el índice según el tipo de archivo
+      if (fileType === 'principal') {
+        setCurrentImageIndex(0); // Índice para la imagen principal
+      } else if (fileType === 'secondary') {
+        setCurrentImageIndex(1); // Índice para la imagen secundaria
+      }
+  
+      // Verifica si el archivo es una imagen antes de abrir el visor
+      const isImage = fileType === 'principal'
+        ? /\.(jpg|jpeg|png)$/i.test(principalDocument?.name || '')
+        : /\.(jpg|jpeg|png)$/i.test(secondaryDocument?.name || '');
+  
       if (isImage) {
-        // Si es imagen, abrimos el visor
-        setCurrentImageUri(index);
-        setViewerVisible(true); // Actualiza el estado para desbloquear la orientación
+        setViewerVisible(true); // Muestra el visor para imágenes
         return;
       }
-      // Si no es imagen, lo abrimos con openDocument
+  
+      // Manejo para documentos no imagen
+      const file = fileType === 'principal' ? principalDocument : secondaryDocument;
+      if (!file) return;
+  
+      const persistentPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${file.name}`;
       const fileExists = await RNFS.exists(persistentPath);
+  
       if (!fileExists) {
         await RNFS.copyFile(file.uri, persistentPath);
       }
+  
       const mimeType = file?.type || '*/*';
       openDocument(persistentPath, mimeType);
     } catch (error) {
@@ -386,20 +400,26 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       showCustomAlert('Error', 'No se pudo abrir el archivo. Asegúrate de que exista.');
     }
   };
+  
+  
 
   // Array de imágenes para el visor
   const images = [
-    principalDocument && { uri: principalDocument.uri },
-    secondaryDocument && { uri: secondaryDocument.uri }
-  ].filter(Boolean);
-
+    principalDocument && { url: principalDocument.uri },
+    secondaryDocument && { url: secondaryDocument.uri },
+  ].filter(Boolean); 
   const deleteFile = (fileType) => {
     if (fileType === 'principal') {
       setPrincipalDocument(null);
     } else if (fileType === 'secondary') {
       setSecondaryDocument(null);
+      if (currentImageIndex === 1) {
+        setCurrentImageIndex(0);
+      }
     }
   };
+  
+
 
   // Render de un archivo existente o icono para agregar
   const renderDocumentFile = (file, fileType, index) => {
@@ -409,13 +429,13 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       );
     }
     const { icon, color } = getIconForFileType(file.name);
-
+  
     return (
       <View key={`${fileType}-${index}`} style={styles.documentSection}>
         <Text style={styles.sectionLabel}>
           {fileType === 'principal' ? 'Principal/Anverso' : 'Secundario/Reverso'}
         </Text>
-        <TouchableOpacity onPress={() => handleFilePress(file, index)} style={styles.fileContainer}>
+        <TouchableOpacity onPress={() => handleFilePress(fileType)} style={styles.fileContainer}>
           {/\.(jpg|jpeg|png)$/i.test(file.name) ? (
             <Image source={{ uri: file.uri }} style={styles.filePreview} />
           ) : (
@@ -440,6 +460,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       </View>
     );
   };
+  
 
   const renderAddFileIcon = (label) => (
     <View key={label} style={styles.documentSection}>
@@ -699,25 +720,39 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
           </View>
         </Modal>
       </ScrollView>
-
-      {/* Visor de imágenes fuera del ScrollView */}
-      <ImageViewing
-        images={images}
-        imageIndex={currentImageUri}
+      {/* Modal de visor de imágenes */}
+      <Modal
         visible={viewerVisible}
-        onRequestClose={() => setViewerVisible(false)} // Actualiza el estado para bloquear la orientación
-        // FooterComponent opcional
-        FooterComponent={({ imageIndex }) => (
-          <TouchableOpacity 
-            onPress={() => Alert.alert('Compartir', `Compartir imagen index ${imageIndex}`)} 
-            style={styles.footerContainer}
+        transparent={true}
+        onRequestClose={() => {
+          setViewerVisible(false);
+          setCurrentImageIndex(0); // Reinicia el índice actual
+        }}
+      >
+        <View style={{ flex: 1, backgroundColor: 'black' }}>
+          {/* Botón "X" para cerrar el modal */}
+          <TouchableOpacity
+            onPress={() => {
+              setViewerVisible(false);
+              setCurrentImageIndex(0); // Reinicia el índice actual al cerrar
+            }}
+            style={styles.closeButton2} // Botón actualizado
           >
-            <FontAwesomeIcon icon={faShareAlt} size={24} color="#fff" />
+            <FontAwesomeIcon icon={faTimes} size={24} color="#fff" />
           </TouchableOpacity>
-        )}
-        // Añadir el prop `imageContainerStyle` para centrar las imágenes
-        imageContainerStyle={styles.imageContainer}
-      />
+          <ImageViewer
+            imageUrls={images}
+            index={currentImageIndex} // Índice dinámico
+            enableSwipeDown
+            onSwipeDown={() => {
+              setViewerVisible(false);
+              setCurrentImageIndex(0); // Reinicia el índice actual
+            }}
+            doubleClickInterval={300}
+            onChange={(index) => setCurrentImageIndex(index || 0)}
+          />
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -750,6 +785,23 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     alignSelf: 'flex-end',
+  },
+  closeButton2: {
+    position: 'absolute',
+    top: 40, // Ajusta según sea necesario
+    right: 20, // Ajusta según sea necesario
+    zIndex: 10, // Asegura que esté sobre el visor
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Fondo semitransparente
+    borderRadius: 20, // Botón redondeado
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: 'bold',
   },
   optionsContainer: {
     flexDirection: 'row',

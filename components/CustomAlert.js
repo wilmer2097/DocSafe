@@ -34,15 +34,6 @@ const CustomAlert = ({
 
           {/* Botones: si showCancel es true, mostramos ambos */}
           <View style={styles.buttonRow}>
-          <Pressable 
-              style={styles.button} 
-              onPress={() => { 
-                onAccept(); 
-                onClose(); 
-              }}
-            >
-              <Text style={styles.buttonText}>Aceptar</Text>
-            </Pressable>
             {showCancel && (
               <Pressable 
                 style={[styles.button, styles.cancelButton]} 
@@ -55,7 +46,15 @@ const CustomAlert = ({
               </Pressable>
             )}
 
-            
+            <Pressable 
+              style={styles.button} 
+              onPress={() => { 
+                onAccept(); 
+                onClose(); 
+              }}
+            >
+              <Text style={styles.buttonText}>Aceptar</Text>
+            </Pressable>
           </View>
         </View>
       </Pressable>
@@ -129,7 +128,7 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   cancelButton: {
-    backgroundColor: '#cc0000',
+    backgroundColor: '#aaaaaa', // Por ejemplo, un color gris
   },
   buttonText: {
     color: '#fff',

@@ -16,7 +16,8 @@ import {
 import RNFS from 'react-native-fs';
 import ReactNativeBiometrics from 'react-native-biometrics';
 import CustomAlert from './CustomAlert';
-import Icon from 'react-native-vector-icons/FontAwesome';
+import { faTimes } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import CheckBox from '@react-native-community/checkbox';
 import * as RNLocalize from 'react-native-localize';
 
@@ -448,7 +449,7 @@ const ProfileScreen = ({ navigation }) => {
                 style={styles.closeButton}
                 onPress={() => setShowCountryPicker(false)}
               >
-                <Icon name="close" size={24} color="#000" />
+                <FontAwesomeIcon icon={faTimes} size={24} color="#000" />
               </TouchableOpacity>
               <ScrollView>
                 {countryDataList.map((country, index) => (

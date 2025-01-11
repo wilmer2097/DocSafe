@@ -1,24 +1,42 @@
-import React, { useState, useCallback, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Linking } from 'react-native';
+import React, { useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  Image,
+  Linking,
+  Alert,
+  Modal,
+} from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
-  faFilePdf, faFileWord, faFileExcel, faFilePowerpoint, faFileImage,
-  faFileAlt, faFileArchive, faFileVideo, faFileAudio, faEye, faLink, faShareAlt
+  faTimes,
+  faFilePdf,
+  faFileWord,
+  faFileExcel,
+  faFilePowerpoint,
+  faImage,
+  faFileAlt,
+  faFileArchive,
+  faFileVideo,
+  faFileAudio,
+  faEye,
+  faLink,
+  faShareAlt,
 } from '@fortawesome/free-solid-svg-icons';
-import ImageViewing from 'react-native-image-viewing';
-import CustomAlert from './CustomAlert';
-import { openDocument } from './utils';
+import ImageViewer from 'react-native-image-zoom-viewer';
 import Share from 'react-native-share';
 import RNFS from 'react-native-fs';
 
 const DocumentItem = ({ documentName }) => {
   const navigation = useNavigation();
-  const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
-  const [documentData, setDocumentData] = useState(null);
+  const [viewerVisible, setViewerVisible] = useState(false);
   const [images, setImages] = useState([]);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+  const [documentData, setDocumentData] = useState(null);
   const [fileType, setFileType] = useState(null);
-  const [initialIndex, setInitialIndex] = useState(0);
   const [isExpired, setIsExpired] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
@@ -33,45 +51,32 @@ const DocumentItem = ({ documentName }) => {
 
     const extension = fileName.split('.').pop().toLowerCase();
     switch (extension) {
-      case 'pdf': return { icon: faFilePdf, color: '#f40000' };
-      case 'doc': case 'docx': return { icon: faFileWord, color: '#1e90ff' };
-      case 'xls': case 'xlsx': return { icon: faFileExcel, color: '#28a745' };
-      case 'ppt': case 'pptx': return { icon: faFilePowerpoint, color: '#ff6347' };
-      case 'jpg': case 'jpeg': case 'png': return { icon: faFileImage, color: '#ffb100' };
-      case 'zip': case 'rar': return { icon: faFileArchive, color: '#f39c12' };
-      case 'mp4': case 'mkv': return { icon: faFileVideo, color: '#f1c40f' };
-      case 'mp3': case 'wav': return { icon: faFileAudio, color: '#8e44ad' };
-      default: return { icon: faFileAlt, color: '#6c757d' };
-    }
-  };
-
-  // Chequea las dimensiones de las imágenes locales en iOS
-  // para confirmar que la ruta file://... se esté leyendo bien.
-  const verifyImagesDimensions = async (imageUris) => {
-    for (const img of imageUris) {
-      try {
-        await new Promise((resolve, reject) => {
-          Image.getSize(
-            img.uri,
-            (width, height) => {
-              resolve({ width, height });
-            },
-            (error) => {
-              reject(error);
-            }
-          );
-        });
-      } catch (err) {
-        // -- OPCIONAL: Copiar el archivo a la caché, y actualizar la URI.
-        // const cachePath = `${RNFS.CachesDirectoryPath}/${Date.now()}_temp.jpg`;
-        // try {
-        //   await RNFS.copyFile(img.uri.replace('file://', ''), cachePath);
-        //   img.uri = `file://${cachePath}`;
-        //   console.log('[verifyImagesDimensions] -> Copia a cachePath exitosa:', cachePath);
-        // } catch (copyError) {
-        //   console.error('Error al copiar a cachePath:', copyError);
-        // }
-      }
+      case 'pdf':
+        return { icon: faFilePdf, color: '#f40000' };
+      case 'doc':
+      case 'docx':
+        return { icon: faFileWord, color: '#1e90ff' };
+      case 'xls':
+      case 'xlsx':
+        return { icon: faFileExcel, color: '#28a745' };
+      case 'ppt':
+      case 'pptx':
+        return { icon: faFilePowerpoint, color: '#ff6347' };
+      case 'jpg':
+      case 'jpeg':
+      case 'png':
+        return { icon: faImage, color: '#ffb100' };
+      case 'zip':
+      case 'rar':
+        return { icon: faFileArchive, color: '#f39c12' };
+      case 'mp4':
+      case 'mkv':
+        return { icon: faFileVideo, color: '#f1c40f' };
+      case 'mp3':
+      case 'wav':
+        return { icon: faFileAudio, color: '#8e44ad' };
+      default:
+        return { icon: faFileAlt, color: '#6c757d' };
     }
   };
 
@@ -86,7 +91,7 @@ const DocumentItem = ({ documentName }) => {
 
       const filesData = await RNFS.readFile(filesJsonPath);
       const parsedFilesData = JSON.parse(filesData);
-      const document = parsedFilesData.archivos.find(doc => doc.nombre === documentName);
+      const document = parsedFilesData.archivos.find((doc) => doc.nombre === documentName);
 
       if (document) {
         setDocumentData(document);
@@ -95,16 +100,11 @@ const DocumentItem = ({ documentName }) => {
         const expiryDate = new Date(document.expiryDate);
         setIsExpired(expiryDate < currentDate);
 
-        const imageUris = document.imagenes.map(file => ({
-          uri: `file://${RNFS.DocumentDirectoryPath}/DocSafe/${file}`,
+        const imageUris = document.imagenes.map((file) => ({
+          url: `file://${RNFS.DocumentDirectoryPath}/DocSafe/${file}`,
         }));
         setImages(imageUris);
-
         setFileType(getFileType(document.imagenes[0]));
-
-        // Verifica que iOS pueda leer las dimensiones (para permitir pinch zoom).
-        verifyImagesDimensions(imageUris);
-
       }
     } catch (error) {
       console.error('Error cargando datos del documento:', error);
@@ -119,12 +119,12 @@ const DocumentItem = ({ documentName }) => {
   );
 
   const handleOpenDocument = async (index) => {
-    if (fileType?.icon === faFileImage && images.length > 0) {
-      setInitialIndex(index);
-      setIsImageViewerVisible(true);
+    if (fileType?.icon === faImage && images.length > 0) {
+      setCurrentImageIndex(index);
+      setViewerVisible(true);
     } else {
       try {
-        await openDocument(images[index]?.uri, fileType?.mimeType);
+        await openDocument(images[index]?.url, fileType?.mimeType);
       } catch (error) {
         showCustomAlert('Error', 'No se pudo abrir el documento.');
       }
@@ -133,7 +133,6 @@ const DocumentItem = ({ documentName }) => {
 
   const handleViewDetails = () => {
     if (documentData) {
-      console.log('Datos del documento antes de navegar:', documentData);
       navigation.navigate('DocumentDetail', { document: documentData });
     } else {
       showCustomAlert('Error', 'No se pudieron cargar los detalles del documento.');
@@ -141,7 +140,7 @@ const DocumentItem = ({ documentName }) => {
   };
 
   const handleOpenURL = async () => {
-    if (documentData && documentData.url) {
+    if (documentData?.url) {
       let url = documentData.url.trim();
       if (!/^https?:\/\//i.test(url)) {
         url = `https://${url}`;
@@ -158,7 +157,7 @@ const DocumentItem = ({ documentName }) => {
 
   const handleShare = async () => {
     try {
-      const fileUris = images.map(img => img.uri);
+      const fileUris = images.map((img) => img.url);
 
       if (fileUris.length === 0) {
         showCustomAlert('Error', 'No hay archivos para compartir.');
@@ -181,22 +180,17 @@ const DocumentItem = ({ documentName }) => {
   return (
     <View style={[styles.itemContainer, isExpired && styles.expiredContainer]}>
       <TouchableOpacity style={styles.previewContainer} onPress={() => handleOpenDocument(0)}>
-        {fileType?.icon === faFileImage && images[0]?.uri ? (
-          <Image
-            source={{ uri: images[0]?.uri }}
-            style={styles.imagePreview}
-          />
+        {fileType?.icon === faImage && images[0]?.url ? (
+          <Image source={{ uri: images[0]?.url }} style={styles.imagePreview} />
         ) : (
           <View style={[styles.iconContainer, { backgroundColor: fileType?.color || '#6c757d' }]}>
-            <FontAwesomeIcon
-              icon={fileType?.icon || faFileAlt}
-              size={24}
-              color="#ffffff"
-            />
+            <FontAwesomeIcon icon={fileType?.icon || faFileAlt} size={24} color="#ffffff" />
           </View>
         )}
         <View style={styles.textContainer}>
-          <Text style={styles.documentName} numberOfLines={1}>{documentName}</Text>
+          <Text style={styles.documentName} numberOfLines={1}>
+            {documentName}
+          </Text>
           {isExpired ? (
             <Text style={styles.expiredText}>Documento expirado</Text>
           ) : (
@@ -216,36 +210,29 @@ const DocumentItem = ({ documentName }) => {
           onPress={documentData?.url ? handleOpenURL : () => showCustomAlert('Error', 'Este documento no tiene una URL asociada.')}
           disabled={!documentData?.url}
         >
-          <FontAwesomeIcon
-            icon={faLink}
-            size={20}
-            color={documentData?.url ? "#185abd" : "#a9a9a9"}
-          />
+          <FontAwesomeIcon icon={faLink} size={20} color={documentData?.url ? '#185abd' : '#a9a9a9'} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
           <FontAwesomeIcon icon={faShareAlt} size={20} color="#185abd" />
         </TouchableOpacity>
       </View>
 
-      {/* Visor de imágenes con props relevantes para zoom */}
-      <ImageViewing
-        images={images}
-        imageIndex={initialIndex}
-        visible={isImageViewerVisible}
-        onRequestClose={() => setIsImageViewerVisible(false)}
-        doubleTapToZoomEnabled={true}
-        swipeToCloseEnabled={false} // Desactiva swipe-to-close para evitar conflicto de gestos en iOS
-      />
-
-      {showAlert && (
-        <CustomAlert
-          visible={showAlert}
-          onClose={() => setShowAlert(false)}
-          title={alertConfig.title}
-          message={alertConfig.message}
-          onAccept={() => setShowAlert(false)}
-        />
-      )}
+      {/* Visor de imágenes */}
+      <Modal visible={viewerVisible} transparent={true} onRequestClose={() => setViewerVisible(false)}>
+        <View style={{ flex: 1, backgroundColor: 'black' }}>
+          <TouchableOpacity onPress={() => setViewerVisible(false)} style={styles.closeButton}>
+            <FontAwesomeIcon icon={faTimes} size={24} color="#fff" />
+          </TouchableOpacity>
+          <ImageViewer
+            imageUrls={images}
+            index={currentImageIndex}
+            enableSwipeDown
+            onSwipeDown={() => setViewerVisible(false)}
+            doubleClickInterval={300}
+            onChange={(index) => setCurrentImageIndex(index || 0)}
+          />
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -304,6 +291,18 @@ const styles = StyleSheet.create({
   expiredText: {
     fontSize: 14,
     color: '#cc0000',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 
