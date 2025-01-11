@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   Linking,
   Alert,
   Modal,
+  Platform,
 } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
@@ -29,6 +30,7 @@ import {
 import ImageViewer from 'react-native-image-zoom-viewer';
 import Share from 'react-native-share';
 import RNFS from 'react-native-fs';
+import Orientation from 'react-native-orientation-locker'; // **Importación añadida**
 
 const DocumentItem = ({ documentName }) => {
   const navigation = useNavigation();
@@ -117,6 +119,17 @@ const DocumentItem = ({ documentName }) => {
       loadDocumentData();
     }, [documentName])
   );
+
+  // **Hook useEffect añadido para manejar la orientación**
+  useEffect(() => {
+    if (viewerVisible) {
+      // Si se abrió el visor, desbloquear todas las orientaciones
+      Orientation.unlockAllOrientations();
+    } else {
+      // Si se cerró el visor, bloquear en modo vertical
+      Orientation.lockToPortrait();
+    }
+  }, [viewerVisible]);
 
   const handleOpenDocument = async (index) => {
     if (fileType?.icon === faImage && images.length > 0) {
@@ -227,12 +240,48 @@ const DocumentItem = ({ documentName }) => {
             imageUrls={images}
             index={currentImageIndex}
             enableSwipeDown
-            onSwipeDown={() => setViewerVisible(false)}
             doubleClickInterval={300}
-            onChange={(index) => setCurrentImageIndex(index || 0)}
+            onSwipeDown={() => setViewerVisible(false)}
+            renderIndicator={(currentIndex, allSize) => (
+              <View style={styles.indicatorContainer}>
+                <Text style={styles.indicatorText}>{`${currentIndex} / ${allSize}`}</Text>
+              </View>
+            )}
+            onChange={(index) => {
+              if (index < images.length) {
+                setCurrentImageIndex(index);
+              } else {
+                setCurrentImageIndex(images.length - 1);
+              }
+            }}
+            saveToLocalByLongPress={false} // Desactiva la opción de guardar imagen por largo clic
+            renderHeader={() => null} // Evita duplicar el botón de cierre
           />
         </View>
       </Modal>
+
+      {/* Alerta personalizada */}
+      {showAlert && (
+        <Modal
+          transparent={true}
+          animationType="fade"
+          visible={showAlert}
+          onRequestClose={() => setShowAlert(false)}
+        >
+          <View style={styles.alertContainer}>
+            <View style={styles.alertBox}>
+              <Text style={styles.alertTitle}>{alertConfig.title}</Text>
+              <Text style={styles.alertMessage}>{alertConfig.message}</Text>
+              <TouchableOpacity
+                style={styles.alertButton}
+                onPress={() => setShowAlert(false)}
+              >
+                <Text style={styles.alertButtonText}>Aceptar</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 };
@@ -294,15 +343,65 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     position: 'absolute',
-    top: 20,
+    top: Platform.OS === 'ios' ? 50 : 20, // Ajusta según la plataforma
     right: 20,
     zIndex: 10,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 20,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Fondo semitransparente
+    borderRadius: 20, // Botón redondeado
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  indicatorContainer: {
+    position: 'absolute',
+    bottom: 20, // Ajusta según tu preferencia
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  indicatorText: {
+    color: '#fff',
+    fontSize: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)', // Fondo semitransparente para mejor legibilidad
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
+  alertContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  alertBox: {
+    width: '80%',
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    padding: 20,
+    alignItems: 'center',
+  },
+  alertTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  alertMessage: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  alertButton: {
+    backgroundColor: '#185abd',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+  },
+  alertButtonText: {
+    color: '#fff',
+    fontSize: 16,
   },
 });
 

@@ -730,7 +730,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
           setCurrentImageIndex(0); // Reinicia el índice actual
         }}
       >
-        <View style={{ flex: 1, backgroundColor: 'black' }}>
+        <View style={styles.modalContainer}>
           {/* Botón "X" para cerrar el modal */}
           <TouchableOpacity
             onPress={() => {
@@ -741,6 +741,8 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
           >
             <FontAwesomeIcon icon={faTimes} size={24} color="#fff" />
           </TouchableOpacity>
+
+          {/* Visor de imágenes */}
           <ImageViewer
             imageUrls={images}
             index={currentImageIndex} // Índice dinámico
@@ -751,6 +753,13 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
             }}
             doubleClickInterval={300}
             onChange={(index) => setCurrentImageIndex(index || 0)}
+            renderIndicator={(currentIndex, allSize) => (
+              <View style={styles.indicatorContainer}>
+                <Text style={styles.indicatorText}>{`${currentIndex} / ${allSize}`}</Text>
+              </View>
+            )}
+            saveToLocalByLongPress={false} // Opcional: Desactiva la opción de guardar imagen por largo clic
+            renderHeader={() => null} // Opcional: Evita duplicar el botón de cierre si está implementado
           />
         </View>
       </Modal>
@@ -762,6 +771,21 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
 // Estilos
 // ------------------------------------------------
 const styles = StyleSheet.create({
+  indicatorContainer: {
+    position: 'absolute',
+    bottom: 20, // Ajusta según tu preferencia
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  indicatorText: {
+    color: '#fff',
+    fontSize: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)', // Fondo semitransparente para mejor legibilidad
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+  },
   container: {
     flexGrow: 1, // Cambiado de padding a flexGrow para mejor manejo del espacio
     backgroundColor: '#f5f5f5',

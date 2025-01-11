@@ -8,22 +8,24 @@ import {
   Alert,
   Switch,
   Image,
-  Modal,
   ScrollView,
+  Modal,
   Platform,
-  Keyboard
+  Keyboard,
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import RNFS from 'react-native-fs';
 import DocumentPicker from 'react-native-document-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
-
 import CustomAlert from './CustomAlert';
-import ImageViewing from 'react-native-image-viewing';
+import ImageViewer from 'react-native-image-zoom-viewer'; // Asegúrate de tener esta librería instalada
 import ImageCropPicker from 'react-native-image-crop-picker';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import Share from 'react-native-share';
+
+// **Importación añadida para manejar la orientación**
+import Orientation from 'react-native-orientation-locker';
 
 import {
   faTrashAlt,
@@ -46,7 +48,8 @@ import {
   faTimesCircle,
   faCamera,
   faImages,
-  faFile
+  faFile,
+  faTimes, // Agregado para el botón de cierre en el visor
 } from '@fortawesome/free-solid-svg-icons';
 
 import { openDocument } from './utils';
@@ -72,8 +75,10 @@ const DocumentDetail = () => {
   // Almacena hasta 2 archivos (índice 0 = principal, índice 1 = secundario)
   const [documentFiles, setDocumentFiles] = useState([null, null]);
 
+  // Estados para el Visor de Imágenes
   const [isImageViewerVisible, setIsImageViewerVisible] = useState(false);
-  const [currentImageUri, setCurrentImageUri] = useState(0);
+  const [currentImageIndex, setCurrentImageIndex] = useState(0);
+
   const [isActionSheetVisible, setIsActionSheetVisible] = useState(false);
   const [editingFileIndex, setEditingFileIndex] = useState(null);
   const [isPicking, setIsPicking] = useState(false);
@@ -91,6 +96,19 @@ const DocumentDetail = () => {
   const descriptionRef = useRef(null);
   const urTextlRef = useRef(null);
   Keyboard.dismiss();
+
+  // --------------------------------------------------------------------
+  // Manejo de la Orientación Dinámica
+  // --------------------------------------------------------------------
+  useEffect(() => {
+    if (isImageViewerVisible) {
+      // Si se abrió el visor, desbloquear todas las orientaciones
+      Orientation.unlockAllOrientations();
+    } else {
+      // Si se cerró el visor, bloquear en modo vertical
+      Orientation.lockToPortrait();
+    }
+  }, [isImageViewerVisible]);
 
   // --------------------------------------------------------------------
   // CARGAR datos del documento
@@ -232,6 +250,8 @@ const DocumentDetail = () => {
       case RESULTS.BLOCKED:
         Alert.alert('Permiso bloqueado', 'Debe habilitar el permiso en configuración para usar esta función.');
         return false;
+      default:
+        return false;
     }
   };
 
@@ -264,9 +284,7 @@ const DocumentDetail = () => {
     Keyboard.dismiss();
 
     try {
-      // Cambia a openCamera si quieres tomar fotos
-      // En este ejemplo seguimos usando openPicker para “simular” la cámara
-      const imagen = await ImageCropPicker.openPicker({
+      const imagen = await ImageCropPicker.openCamera({
         cropping: true,
         includeBase64: false,
         freeStyleCropEnabled: true,
@@ -334,7 +352,7 @@ const DocumentDetail = () => {
     try {
       const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
       if (result && result[0]) {
-        const originalExt = result[0].name ? '.' + result[0].name.split('.').pop() : '.dat';
+        const originalExt = result[0].name ? '.' + result[0].name.split('.').pop().toLowerCase() : '.dat';
         const uniqueName = generateUniqueFilename(originalExt);
 
         const filePath = result[0].uri;
@@ -419,6 +437,7 @@ const DocumentDetail = () => {
       await Share.open(shareOptions);
     } catch (error) {
       console.error('Error al compartir el documento:', error);
+      showCustomAlert('Error', 'No se pudo compartir el documento.');
     }
   };
 
@@ -463,15 +482,24 @@ const DocumentDetail = () => {
   };
 
   // --------------------------------------------------------------------
-  // handleFilePress: si es imagen -> visor, si no -> openDocument
+  // handleFilePress: Actualizar el índice correctamente
   // --------------------------------------------------------------------
   const handleFilePress = (file, index) => {
     if (!file) return;
 
     const isImage = /\.(jpg|jpeg|png)$/i.test(file);
     if (isImage) {
-      setCurrentImageUri(index);
-      setIsImageViewerVisible(true);
+      // Encontrar el índice en imagesForViewer
+      const imageIndex = documentFiles
+        .filter(f => f && /\.(jpg|jpeg|png)$/i.test(f))
+        .findIndex(f => f === file);
+
+      if (imageIndex !== -1) {
+        setCurrentImageIndex(imageIndex);
+        setIsImageViewerVisible(true);
+      } else {
+        console.warn('El archivo de imagen no se encontró en imagesForViewer.');
+      }
     } else {
       try {
         const mimeType = getMimeType(file);
@@ -521,7 +549,7 @@ const DocumentDetail = () => {
             descripcion: description,
             url: url,
             expiryDate: expiryDate.toISOString(),
-            share: share
+            share: share,
             // "imagenes" ya se actualizó en cada cambio individual
           };
 
@@ -597,11 +625,12 @@ const DocumentDetail = () => {
 
     // Hay un archivo
     const { icon, color } = getFileType(file);
+    const isImage = /\.(jpg|jpeg|png)$/i.test(file);
     return (
       <View key={index} style={styles.documentSection}>
         <Text style={styles.sectionLabel}>{label}</Text>
         <TouchableOpacity style={styles.fileContainer} onPress={() => handleFilePress(file, index)}>
-          {icon === faFileImage ? (
+          {isImage ? (
             <Image source={{ uri: `file://${file}` }} style={styles.filePreview} />
           ) : (
             <FontAwesomeIcon icon={icon} size={50} color={color} />
@@ -634,9 +663,9 @@ const DocumentDetail = () => {
   // --------------------------------------------------------------------
   // Imagenes para el Visor
   // --------------------------------------------------------------------
-  const images = documentFiles
+  const imagesForViewer = documentFiles
     .filter(file => file && /\.(jpg|jpeg|png)$/i.test(file))
-    .map(file => ({ uri: `file://${file}` }));
+    .map(file => ({ url: `file://${file}` }));
 
   // --------------------------------------------------------------------
   // Alertas personalizadas
@@ -653,9 +682,9 @@ const DocumentDetail = () => {
     }
   };
 
-  const validateURL = (url) => {
+  const validateURL = (urlToCheck) => {
     const pattern = /^(https?:\/\/)?([\da-z.-]+)\.([a-z.]{2,6})([/\w .-]*)*\/?$/;
-    return pattern.test(url);
+    return pattern.test(urlToCheck);
   };
 
   // --------------------------------------------------------------------
@@ -675,6 +704,9 @@ const DocumentDetail = () => {
       ),
       title: 'Detalles del Documento',
       headerTitleStyle: styles.headerTitle,
+      headerStyle: {
+        backgroundColor: '#185abd', // Color de fondo del encabezado
+      },
     });
   }, [navigation, documentFiles]);
 
@@ -682,8 +714,7 @@ const DocumentDetail = () => {
   // Render principal
   // --------------------------------------------------------------------
   return (
-    <ScrollView style={styles.container}>
-
+    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
       {/* Nombre */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Nombre del documento:</Text>
@@ -774,12 +805,35 @@ const DocumentDetail = () => {
       </TouchableOpacity>
 
       {/* Visor de imágenes */}
-      <ImageViewing
-        images={images}
-        imageIndex={currentImageUri}
+      <Modal
         visible={isImageViewerVisible}
+        transparent={true}
         onRequestClose={() => setIsImageViewerVisible(false)}
-      />
+      >
+        <View style={styles.imageViewerContainer}>
+          {/* Botón "X" para cerrar el visor */}
+          <TouchableOpacity
+            onPress={() => setIsImageViewerVisible(false)}
+            style={styles.closeButton2} // Botón actualizado
+          >
+            <FontAwesomeIcon icon={faTimes} size={30} color="#fff" />
+          </TouchableOpacity>
+          <ImageViewer
+            imageUrls={imagesForViewer}
+            index={currentImageIndex}
+            enableSwipeDown
+            doubleClickInterval={300}
+            onSwipeDown={() => setIsImageViewerVisible(false)}
+            renderIndicator={(currentIndex, allSize) => (
+              <View style={styles.indicatorContainer}>
+                <Text style={styles.indicatorText}>{`${currentIndex} / ${allSize}`}</Text>
+              </View>
+            )}
+            saveToLocalByLongPress={false} // Desactiva la opción de guardar imagen por largo clic
+            renderHeader={() => null} // Evita duplicar el botón de cierre
+          />
+        </View>
+      </Modal>
 
       {/* Modal para ActionSheet (Cámara, Galería, Archivos) */}
       <Modal visible={isActionSheetVisible} transparent={true} animationType="slide">
@@ -789,26 +843,35 @@ const DocumentDetail = () => {
               <FontAwesomeIcon icon={faTimesCircle} size={24} color="#999" />
             </TouchableOpacity>
             <View style={styles.optionsContainer}>
-              <TouchableOpacity onPress={async () => {
-                setIsActionSheetVisible(false);
-                const granted = await requestPermission('camera');
-                if (granted) abrirCamara();
-              }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  setIsActionSheetVisible(false);
+                  const granted = await requestPermission('camera');
+                  if (granted) abrirCamara();
+                }}
+                style={styles.optionButton}
+              >
                 <FontAwesomeIcon icon={faCamera} size={40} color="#185abd" />
                 <Text style={styles.optionText}>Cámara</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={async () => {
-                setIsActionSheetVisible(false);
-                const granted = await requestPermission('gallery');
-                if (granted) abrirGaleria();
-              }}>
+              <TouchableOpacity
+                onPress={async () => {
+                  setIsActionSheetVisible(false);
+                  const granted = await requestPermission('gallery');
+                  if (granted) abrirGaleria();
+                }}
+                style={styles.optionButton}
+              >
                 <FontAwesomeIcon icon={faImages} size={40} color="#185abd" />
                 <Text style={styles.optionText}>Galería</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={() => {
-                setIsActionSheetVisible(false);
-                abrirDocumentos();
-              }}>
+              <TouchableOpacity
+                onPress={() => {
+                  setIsActionSheetVisible(false);
+                  abrirDocumentos();
+                }}
+                style={styles.optionButton}
+              >
                 <FontAwesomeIcon icon={faFile} size={40} color="#185abd" />
                 <Text style={styles.optionText}>Archivos</Text>
               </TouchableOpacity>
@@ -830,21 +893,19 @@ const DocumentDetail = () => {
 
       {/* Alerta para confirmar borrado TOTAL */}
       {showDeleteConfirm && (
-      <CustomAlert
-        visible={showDeleteConfirm}
-        onClose={() => setShowDeleteConfirm(false)}
-        title="Confirmar"
-        message="¿Seguro que desea eliminar este documento?"
-        showCancel={true}          // Mostrará el botón “Cancelar”
-        onAccept={deleteDocument}  // Acción al Aceptar
-        onCancel={() => {
-          console.log('El usuario canceló la eliminación');
-          // Otras acciones si quieres
-        }}
-      />
-    )}
-
-
+        <CustomAlert
+          visible={showDeleteConfirm}
+          onClose={() => setShowDeleteConfirm(false)}
+          title="Confirmar"
+          message="¿Seguro que desea eliminar este documento?"
+          showCancel={true} // Mostrará el botón “Cancelar”
+          onAccept={deleteDocument} // Acción al Aceptar
+          onCancel={() => {
+            console.log('El usuario canceló la eliminación');
+            // Otras acciones si quieres
+          }}
+        />
+      )}
     </ScrollView>
   );
 };
@@ -951,6 +1012,11 @@ const styles = StyleSheet.create({
     padding: 8,
     marginHorizontal: 4,
   },
+  shareContainer: {
+    paddingTop: 25,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   urlContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -990,11 +1056,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  shareContainer: {
-    paddingTop: 25,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
   saveButton: {
     backgroundColor: '#185abd',
     flexDirection: 'row',
@@ -1013,8 +1074,8 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)', // Fondo semitransparente
     justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   actionSheet: {
     backgroundColor: '#fff',
@@ -1036,6 +1097,40 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 16,
     color: '#333',
+  },
+  optionButton: {
+    alignItems: 'center',
+  },
+  imageViewerContainer: {
+    flex: 1,
+    backgroundColor: 'black',
+  },
+  closeButton2: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 20, // Ajusta según la plataforma
+    right: 20,
+    zIndex: 1, // Asegura que esté sobre el visor
+    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Fondo semitransparente
+    borderRadius: 20, // Botón redondeado
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  indicatorContainer: {
+    position: 'absolute',
+    bottom: 20, // Ajusta según tu preferencia
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+  },
+  indicatorText: {
+    color: '#fff',
+    fontSize: 16,
+    backgroundColor: 'rgba(0,0,0,0.4)', // Fondo semitransparente para mejor legibilidad
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
 });
 
