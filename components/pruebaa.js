@@ -1,34 +1,58 @@
-// ImageViewerTest.js
-import React, { useState } from 'react';
-import { View, Button, StyleSheet, Image } from 'react-native';
-import ImageViewing from 'react-native-image-viewing';
+import React, { useState, useEffect } from 'react';
+import { View, Button, Modal, Dimensions } from 'react-native';
+import ImageViewer from 'react-native-image-zoom-viewer';
+import Orientation from 'react-native-orientation-locker';
 
-export default function ImageViewerTest() {
+const App = () => {
   const [visible, setVisible] = useState(false);
+  const [dimensions, setDimensions] = useState(Dimensions.get('window'));
 
-  // Array de imágenes
   const images = [
-    { uri: Image.resolveAssetSource(require('../src/presentation/assets/Logo.jpg')).uri },
-    { uri: Image.resolveAssetSource(require('../src/presentation/assets/Logo.jpg')).uri },
+    {
+      url: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/d0db663bf28844dcbd744935cdd8c71083e0031c-5600x3150.jpg',
+    },
+    {
+      url: 'https://cmsassets.rgpub.io/sanity/images/dsfx7636/news_live/77689751053a9cc507696fce850e345776667f0e-2560x1440.jpg',
+    },
   ];
 
+  useEffect(() => {
+    const handleDimensionChange = ({ window }) => {
+      setDimensions(window);
+    };
+
+    let subscription;
+    if (visible) {
+      Orientation.unlockAllOrientations();
+      subscription = Dimensions.addEventListener('change', handleDimensionChange);
+    } else {
+      Orientation.lockToPortrait();
+    }
+
+    return () => {
+      Orientation.lockToPortrait();
+      subscription?.remove();
+    };
+  }, [visible]);
+
   return (
-    <View style={styles.container}>
-      <Button title="Mostrar visor" onPress={() => setVisible(true)} />
-      <ImageViewing
-        images={images}
-        imageIndex={0}        // índice inicial
-        visible={visible}     // cuando true, se muestra el visor
-        onRequestClose={() => setVisible(false)}  // callback de cierre
-      />
+    <View style={{ flex: 1 }}>
+      <Button title="Mostrar imágenes" onPress={() => setVisible(true)} />
+      <Modal visible={visible} transparent={true} onRequestClose={() => setVisible(false)}>
+        <ImageViewer
+          imageUrls={images}
+          enableSwipeDown
+          onSwipeDown={() => setVisible(false)}
+          doubleClickInterval={300} // Ajusta este valor según tu preferencia
+          renderIndicator={(currentIndex, allSize) => (
+            <View style={{ position: 'absolute', top: 40, left: 20 }}>
+              <Button title={`Imagen ${currentIndex} de ${allSize}`} />
+            </View>
+          )}
+        />
+      </Modal>
     </View>
   );
-}
+};
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  }
-});
+export default App;

@@ -87,12 +87,12 @@ const CustomDrawerContent = (props) => {
           </View>
         </TouchableOpacity>
 
-        {/* <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('TestScreen')}>
+       <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('TestScreen')}>
           <View style={styles.iconAndText}>
             <FontAwesomeIcon icon={faQuestionCircle} size={20} color="#185abd" style={styles.menuIcon} />
             <Text style={styles.menuText}>TestScreen</Text>
           </View>
-        </TouchableOpacity> */}
+        </TouchableOpacity>
 
         <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Copia Backup')}>
           <View style={styles.iconAndText}>
