@@ -830,14 +830,20 @@ const DocumentDetail = () => {
 
       {/* Alerta para confirmar borrado TOTAL */}
       {showDeleteConfirm && (
-        <CustomAlert
-          visible={showDeleteConfirm}
-          onClose={() => setShowDeleteConfirm(false)}
-          title="Confirmar"
-          message="¿Seguro que desea eliminar este documento?"
-          onAccept={deleteDocument}
-        />
-      )}
+      <CustomAlert
+        visible={showDeleteConfirm}
+        onClose={() => setShowDeleteConfirm(false)}
+        title="Confirmar"
+        message="¿Seguro que desea eliminar este documento?"
+        showCancel={true}          // Mostrará el botón “Cancelar”
+        onAccept={deleteDocument}  // Acción al Aceptar
+        onCancel={() => {
+          console.log('El usuario canceló la eliminación');
+          // Otras acciones si quieres
+        }}
+      />
+    )}
+
 
     </ScrollView>
   );

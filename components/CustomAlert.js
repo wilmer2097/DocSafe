@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   cancelButton: {
-    backgroundColor: '#aaaaaa', // Por ejemplo, un color gris
+    backgroundColor: '#cc0000', // Por ejemplo, un color gris
   },
   buttonText: {
     color: '#fff',

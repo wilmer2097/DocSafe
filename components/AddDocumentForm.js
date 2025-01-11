@@ -682,13 +682,14 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
 
         {/* Botones de Guardar y Cancelar */}
         <View style={styles.buttonContainer}>
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <FontAwesomeIcon icon={faSave} size={24} color="#fff" />
-            <Text style={styles.buttonText}>Guardar</Text>
-          </TouchableOpacity>
+          
           <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
             <FontAwesomeIcon icon={faTimesCircle} size={24} color="#fff" />
             <Text style={styles.buttonText}>Cancelar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+            <FontAwesomeIcon icon={faSave} size={24} color="#fff" />
+            <Text style={styles.buttonText}>Guardar</Text>
           </TouchableOpacity>
         </View>
 
@@ -956,6 +957,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 10,
     padding: 16,
     borderRadius: 8,
     flex: 1,
