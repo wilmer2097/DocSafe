@@ -512,6 +512,44 @@ const DocumentDetail = () => {
   };
 
   // --------------------------------------------------------------------
+  // handleActionSheetPress: Maneja las opciones del Action Sheet con retardo
+  // --------------------------------------------------------------------
+  const handleActionSheetPress = (option) => {
+    setIsActionSheetVisible(false);
+    documentNameRef.current?.blur();
+    descriptionRef.current?.blur();
+    urTextlRef.current?.blur();
+    Keyboard.dismiss();
+
+    setTimeout(async () => {
+      let permissionResult;
+      switch (option) {
+        case 'camera':
+          permissionResult = await requestPermission('camera');
+          if (permissionResult) {
+            abrirCamara();
+          } else {
+            Alert.alert('Permiso denegado', 'Se necesita acceso a la cámara para tomar fotos.');
+          }
+          break;
+        case 'gallery':
+          permissionResult = await requestPermission('gallery');
+          if (permissionResult) {
+            abrirGaleria();
+          } else {
+            Alert.alert('Permiso denegado', 'Se necesita acceso a la galería para seleccionar fotos.');
+          }
+          break;
+        case 'files':
+          abrirDocumentos();
+          break;
+        default:
+          console.warn('Opción no reconocida en handleActionSheetPress:', option);
+      }
+    }, 1000); // Retardo de 1 segundo
+  };
+
+  // --------------------------------------------------------------------
   // BOTÓN GUARDAR => actualiza name, description, url, expiryDate
   // --------------------------------------------------------------------
   const saveDocumentData = async () => {
@@ -843,35 +881,15 @@ const DocumentDetail = () => {
               <FontAwesomeIcon icon={faTimesCircle} size={24} color="#999" />
             </TouchableOpacity>
             <View style={styles.optionsContainer}>
-              <TouchableOpacity
-                onPress={async () => {
-                  setIsActionSheetVisible(false);
-                  const granted = await requestPermission('camera');
-                  if (granted) abrirCamara();
-                }}
-                style={styles.optionButton}
-              >
+              <TouchableOpacity onPress={() => handleActionSheetPress('camera')} style={styles.optionButton}>
                 <FontAwesomeIcon icon={faCamera} size={40} color="#185abd" />
                 <Text style={styles.optionText}>Cámara</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={async () => {
-                  setIsActionSheetVisible(false);
-                  const granted = await requestPermission('gallery');
-                  if (granted) abrirGaleria();
-                }}
-                style={styles.optionButton}
-              >
+              <TouchableOpacity onPress={() => handleActionSheetPress('gallery')} style={styles.optionButton}>
                 <FontAwesomeIcon icon={faImages} size={40} color="#185abd" />
                 <Text style={styles.optionText}>Galería</Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setIsActionSheetVisible(false);
-                  abrirDocumentos();
-                }}
-                style={styles.optionButton}
-              >
+              <TouchableOpacity onPress={() => handleActionSheetPress('files')} style={styles.optionButton}>
                 <FontAwesomeIcon icon={faFile} size={40} color="#185abd" />
                 <Text style={styles.optionText}>Archivos</Text>
               </TouchableOpacity>
