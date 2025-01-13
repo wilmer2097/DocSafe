@@ -221,7 +221,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
           abrirSelectorDocumentos(fileType);
           break;
       }
-    }, 500);
+    }, 1000);
   };
 
   // ------------------------------

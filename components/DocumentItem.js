@@ -31,11 +31,13 @@ import ImageViewer from 'react-native-image-zoom-viewer';
 import Share from 'react-native-share';
 import RNFS from 'react-native-fs';
 import Orientation from 'react-native-orientation-locker'; // **Importación añadida**
+// Importa openDocument desde utils
+import { openDocument } from './utils'; // Asegúrate de ajustar la ruta según tu estructura de archivos
 
 const DocumentItem = ({ documentName }) => {
   const navigation = useNavigation();
   const [viewerVisible, setViewerVisible] = useState(false);
-  const [images, setImages] = useState([]);
+  const [images, setImages] = useState([]); // Todos los archivos
   const [currentImageIndex, setCurrentImageIndex] = useState(0);
   const [documentData, setDocumentData] = useState(null);
   const [fileType, setFileType] = useState(null);
@@ -102,10 +104,10 @@ const DocumentItem = ({ documentName }) => {
         const expiryDate = new Date(document.expiryDate);
         setIsExpired(expiryDate < currentDate);
 
-        const imageUris = document.imagenes.map((file) => ({
+        const allFileUris = document.imagenes.map((file) => ({
           url: `file://${RNFS.DocumentDirectoryPath}/DocSafe/${file}`,
         }));
-        setImages(imageUris);
+        setImages(allFileUris);
         setFileType(getFileType(document.imagenes[0]));
       }
     } catch (error) {
@@ -132,12 +134,22 @@ const DocumentItem = ({ documentName }) => {
   }, [viewerVisible]);
 
   const handleOpenDocument = async (index) => {
-    if (fileType?.icon === faImage && images.length > 0) {
-      setCurrentImageIndex(index);
+    const currentFile = images[index]?.url;
+    if (!currentFile) {
+      showCustomAlert('Error', 'El archivo no está disponible.');
+      return;
+    }
+
+    const isImage = /\.(jpg|jpeg|png)$/i.test(currentFile);
+    if (isImage) {
+      // Encontrar el índice en imagesForViewer
+      const imagesOnly = images.filter(file => /\.(jpg|jpeg|png)$/i.test(file.url));
+      const imageIndex = imagesOnly.findIndex(file => file.url === currentFile);
+      setCurrentImageIndex(imageIndex);
       setViewerVisible(true);
     } else {
       try {
-        await openDocument(images[index]?.url, fileType?.mimeType);
+        await openDocument(currentFile);
       } catch (error) {
         showCustomAlert('Error', 'No se pudo abrir el documento.');
       }
@@ -190,6 +202,11 @@ const DocumentItem = ({ documentName }) => {
     }
   };
 
+  // Define imagesForViewer con solo imágenes
+  const imagesForViewer = images
+    .filter(file => /\.(jpg|jpeg|png)$/i.test(file.url))
+    .map(file => ({ url: file.url }));
+
   return (
     <View style={[styles.itemContainer, isExpired && styles.expiredContainer]}>
       <TouchableOpacity style={styles.previewContainer} onPress={() => handleOpenDocument(0)}>
@@ -220,10 +237,18 @@ const DocumentItem = ({ documentName }) => {
         </TouchableOpacity>
         <TouchableOpacity
           style={styles.actionButton}
-          onPress={documentData?.url ? handleOpenURL : () => showCustomAlert('Error', 'Este documento no tiene una URL asociada.')}
+          onPress={
+            documentData?.url
+              ? handleOpenURL
+              : () => showCustomAlert('Error', 'Este documento no tiene una URL asociada.')
+          }
           disabled={!documentData?.url}
         >
-          <FontAwesomeIcon icon={faLink} size={20} color={documentData?.url ? '#185abd' : '#a9a9a9'} />
+          <FontAwesomeIcon
+            icon={faLink}
+            size={20}
+            color={documentData?.url ? '#185abd' : '#a9a9a9'}
+          />
         </TouchableOpacity>
         <TouchableOpacity style={styles.actionButton} onPress={handleShare}>
           <FontAwesomeIcon icon={faShareAlt} size={20} color="#185abd" />
@@ -237,7 +262,7 @@ const DocumentItem = ({ documentName }) => {
             <FontAwesomeIcon icon={faTimes} size={24} color="#fff" />
           </TouchableOpacity>
           <ImageViewer
-            imageUrls={images}
+            imageUrls={imagesForViewer}
             index={currentImageIndex}
             enableSwipeDown
             doubleClickInterval={300}
@@ -248,10 +273,10 @@ const DocumentItem = ({ documentName }) => {
               </View>
             )}
             onChange={(index) => {
-              if (index < images.length) {
+              if (index < imagesForViewer.length) {
                 setCurrentImageIndex(index);
               } else {
-                setCurrentImageIndex(images.length - 1);
+                setCurrentImageIndex(imagesForViewer.length - 1);
               }
             }}
             saveToLocalByLongPress={false} // Desactiva la opción de guardar imagen por largo clic
