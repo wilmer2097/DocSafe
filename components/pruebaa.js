@@ -39,7 +39,7 @@ const App = () => {
   return (
     <View style={{ flex: 1 }}>
       <Button title="Mostrar imágenes" onPress={() => setVisible(true)} />
-      <Modal visible={visible} transparent={true} onRequestClose={() => setVisible(false)}>
+      <Modal visible={visible} transparent={true} supportedOrientations={['portrait', 'landscape']}  onRequestClose={() => setVisible(false)}>
         <ImageViewer
           imageUrls={images}
           enableSwipeDown
