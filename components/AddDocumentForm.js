@@ -46,7 +46,7 @@ import CustomAlert from './CustomAlert';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 
 // **Importación añadida**
-import Orientation from 'react-native-orientation-locker';
+//import Orientation from 'react-native-orientation-locker';
 
 const generateUUID = () => {
   return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
@@ -135,10 +135,10 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   useEffect(() => {
     if (viewerVisible) {
       // Si se abrió el visor, desbloquear para permitir landscape
-      Orientation.unlockAllOrientations();
+      // Orientation.unlockAllOrientations();
     } else {
       // Si se cerró el visor, bloquear en modo vertical
-      Orientation.lockToPortrait();
+      // Orientation.lockToPortrait();
     }
     // Limpieza no es necesaria aquí, ya que en cada cambio de viewerVisible se maneja
   }, [viewerVisible]);

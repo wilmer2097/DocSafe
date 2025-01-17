@@ -30,7 +30,7 @@ import {
 import ImageViewer from 'react-native-image-zoom-viewer';
 import Share from 'react-native-share';
 import RNFS from 'react-native-fs';
-import Orientation from 'react-native-orientation-locker'; // **Importación añadida**
+// import Orientation from 'react-native-orientation-locker'; // **Importación añadida**
 // Importa openDocument desde utils
 import { openDocument } from './utils'; // Asegúrate de ajustar la ruta según tu estructura de archivos
 
@@ -126,10 +126,10 @@ const DocumentItem = ({ documentName }) => {
   useEffect(() => {
     if (viewerVisible) {
       // Si se abrió el visor, desbloquear todas las orientaciones
-      Orientation.unlockAllOrientations();
+      // Orientation.unlockAllOrientations();
     } else {
       // Si se cerró el visor, bloquear en modo vertical
-      Orientation.lockToPortrait();
+      // Orientation.lockToPortrait();
     }
   }, [viewerVisible]);
 

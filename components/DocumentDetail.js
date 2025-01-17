@@ -25,7 +25,7 @@ import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import Share from 'react-native-share';
 
 // **Importación añadida para manejar la orientación**
-import Orientation from 'react-native-orientation-locker';
+// import Orientation from 'react-native-orientation-locker';
 
 import {
   faTrashAlt,
@@ -103,10 +103,10 @@ const DocumentDetail = () => {
   useEffect(() => {
     if (isImageViewerVisible) {
       // Si se abrió el visor, desbloquear todas las orientaciones
-      Orientation.unlockAllOrientations();
+      // Orientation.unlockAllOrientations();
     } else {
       // Si se cerró el visor, bloquear en modo vertical
-      Orientation.lockToPortrait();
+      // Orientation.lockToPortrait();
     }
   }, [isImageViewerVisible]);
 

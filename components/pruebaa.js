@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, Button, Modal, Dimensions } from 'react-native';
 import ImageViewer from 'react-native-image-zoom-viewer';
-import Orientation from 'react-native-orientation-locker';
+// import Orientation from 'react-native-orientation-locker';
 
 const App = () => {
   const [visible, setVisible] = useState(false);
@@ -20,20 +20,21 @@ const App = () => {
     const handleDimensionChange = ({ window }) => {
       setDimensions(window);
     };
-
+  
     let subscription;
     if (visible) {
-      Orientation.unlockAllOrientations();
+      // Orientation.unlockAllOrientations(); // Comentado para deshabilitar el desbloqueo de orientación
       subscription = Dimensions.addEventListener('change', handleDimensionChange);
     } else {
-      Orientation.lockToPortrait();
+      // Orientation.lockToPortrait(); // Comentado para bloquear la orientación en vertical
     }
-
+  
     return () => {
-      Orientation.lockToPortrait();
+      // Orientation.lockToPortrait(); // Comentado para restablecer orientación
       subscription?.remove();
     };
   }, [visible]);
+  
 
   return (
     <View style={{ flex: 1 }}>
