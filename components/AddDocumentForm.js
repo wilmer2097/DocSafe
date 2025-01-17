@@ -725,6 +725,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
       <Modal
         visible={viewerVisible}
         transparent={true}
+        supportedOrientations={['portrait', 'landscape']}
         onRequestClose={() => {
           setViewerVisible(false);
           setCurrentImageIndex(0); // Reinicia el índice actual

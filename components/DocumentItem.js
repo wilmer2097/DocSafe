@@ -265,6 +265,7 @@ const DocumentItem = ({ documentName }) => {
             imageUrls={imagesForViewer}
             index={currentImageIndex}
             enableSwipeDown
+            supportedOrientations={['portrait', 'landscape']}
             doubleClickInterval={300}
             onSwipeDown={() => setViewerVisible(false)}
             renderIndicator={(currentIndex, allSize) => (

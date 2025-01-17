@@ -859,6 +859,7 @@ const DocumentDetail = () => {
           <ImageViewer
             imageUrls={imagesForViewer}
             index={currentImageIndex}
+            supportedOrientations={['portrait', 'landscape']}
             enableSwipeDown
             doubleClickInterval={300}
             onSwipeDown={() => setIsImageViewerVisible(false)}
