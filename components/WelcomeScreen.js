@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, Linking } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, Linking, ScrollView  } from 'react-native';
 import SwiperFlatList from 'react-native-swiper-flatlist';
 import { useNavigation } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
@@ -51,6 +51,7 @@ const WelcomeScreen = () => {
   ];
 
   return (
+    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
     <View style={styles.container}>
       <View style={styles.topContent}>
         <View style={styles.titleContainer}>
@@ -108,6 +109,7 @@ const WelcomeScreen = () => {
         <Text style={styles.versionText}>Versión {appVersion}</Text>
       </View>
     </View>
+    </ScrollView>
   );
 };
 
@@ -115,6 +117,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f5f5f5',
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
   topContent: {
     flex: 1,
@@ -157,7 +163,7 @@ const styles = StyleSheet.create({
     marginTop: 100,
     width: width,
     height: 200,
-    marginBottom: 15,
+    marginBottom: 25,
   },
   carouselSlide: {
     height: 200,

@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Image,
   SafeAreaView,
-  Dimensions
+  Dimensions, ScrollView
 } from 'react-native';
 import RNFS from 'react-native-fs';
 import { useFocusEffect } from '@react-navigation/native';
@@ -210,6 +210,7 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
+    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
         <Text style={styles.docSafe}>DocSafe</Text>
@@ -294,6 +295,7 @@ const LoginScreen = ({ navigation }) => {
         onAccept={() => setAlertVisible(false)}
       />
     </SafeAreaView>
+    </ScrollView>
   );
 };
 
@@ -305,6 +307,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20
+  },
+  scrollContent: {
+    flexGrow: 1,
+    justifyContent: 'space-between',
   },
   docSafe: {
     fontSize: 40,
@@ -332,7 +338,7 @@ const styles = StyleSheet.create({
   codeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: width * 0.6,
+    width: 240, // Ajustado a tamaño fijo
     marginBottom: 30
   },
   codeDot: {
@@ -351,19 +357,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#155abd'
   },
   keypadContainer: {
-    width: width * 0.8,
+    width: '90%',
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between'
   },
   keypadButton: {
-    width: width * 0.24,
-    height: width * 0.14,
+    width: 100,
+    height: 50, 
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#155abd',
     borderRadius: 10,
-    marginBottom: 15
+    margin: 5, 
   },
   specialButton: { backgroundColor: '#1e7eff' },
   keypadButtonText: { color: '#fff', fontSize: 24, fontWeight: '600' },

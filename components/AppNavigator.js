@@ -3,7 +3,7 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Linking } from 'react-native';
+import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Linking, ScrollView } from 'react-native';
 import RNFS from 'react-native-fs';
 import {
   FontAwesomeIcon
@@ -56,6 +56,7 @@ const CustomDrawerContent = (props) => {
   }, []);
 
   return (
+    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
     <SafeAreaView style={styles.drawerContent}>
       <View style={styles.profileSection}>
         <TouchableOpacity style={styles.profileImageContainer} onPress={() => props.navigation.navigate('Profile')}>
@@ -87,12 +88,12 @@ const CustomDrawerContent = (props) => {
           </View>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('TestScreen')}>
+        {/* <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('TestScreen')}>
           <View style={styles.iconAndText}>
             <FontAwesomeIcon icon={faQuestionCircle} size={20} color="#185abd" style={styles.menuIcon} />
             <Text style={styles.menuText}>TestScreen</Text>
           </View>
-        </TouchableOpacity> 
+        </TouchableOpacity>  */}
 
         <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Copia Backup')}>
           <View style={styles.iconAndText}>
@@ -122,6 +123,7 @@ const CustomDrawerContent = (props) => {
         <Text style={styles.logoutText}>Cerrar Sesión</Text>
       </TouchableOpacity>
     </SafeAreaView>
+    </ScrollView>
   );
 };
 
@@ -312,6 +314,10 @@ const styles = StyleSheet.create({
   drawerContent: {
     flex: 1,
     backgroundColor: '#f5f5f5', 
+    justifyContent: 'space-between',
+  },
+  scrollContent: {
+    flexGrow: 1,
     justifyContent: 'space-between',
   },
   profileSection: {

@@ -24,7 +24,6 @@ import ImageCropPicker from 'react-native-image-crop-picker';
 import { check, request, PERMISSIONS, RESULTS } from 'react-native-permissions';
 import Share from 'react-native-share';
 
-// **Importación añadida para manejar la orientación**
 // import Orientation from 'react-native-orientation-locker';
 
 import {
@@ -49,7 +48,7 @@ import {
   faCamera,
   faImages,
   faFile,
-  faTimes, // Agregado para el botón de cierre en el visor
+  faTimes,
 } from '@fortawesome/free-solid-svg-icons';
 
 import { openDocument } from './utils';
@@ -91,28 +90,23 @@ const DocumentDetail = () => {
   // Alerta para confirmar borrado total del documento
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
+  // --------- ESTADO NUEVO para confirmar borrado de archivo individual ---------
+  const [fileDeleteConfirm, setFileDeleteConfirm] = useState({ show: false, file: null, index: null });
+
   // Refs
   const documentNameRef = useRef(null);
   const descriptionRef = useRef(null);
   const urTextlRef = useRef(null);
   Keyboard.dismiss();
 
-  // --------------------------------------------------------------------
-  // Manejo de la Orientación Dinámica
-  // --------------------------------------------------------------------
   useEffect(() => {
     if (isImageViewerVisible) {
-      // Si se abrió el visor, desbloquear todas las orientaciones
       // Orientation.unlockAllOrientations();
     } else {
-      // Si se cerró el visor, bloquear en modo vertical
       // Orientation.lockToPortrait();
     }
   }, [isImageViewerVisible]);
 
-  // --------------------------------------------------------------------
-  // CARGAR datos del documento
-  // --------------------------------------------------------------------
   useEffect(() => {
     const loadDocumentData = async () => {
       const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
@@ -133,7 +127,6 @@ const DocumentDetail = () => {
           const filesToShow = fileData.imagenes.map(fileName =>
             `${RNFS.DocumentDirectoryPath}/DocSafe/${fileName}`
           );
-          // Aseguramos que haya 2 slots (0, 1)
           const finalFiles = [null, null];
           filesToShow.forEach((filePath, idx) => {
             if (idx < 2) finalFiles[idx] = filePath;
@@ -148,9 +141,6 @@ const DocumentDetail = () => {
     loadDocumentData();
   }, [document.id_archivo]);
 
-  // --------------------------------------------------------------------
-  // Actualizar SOLO la parte de “imagenes” en el JSON
-  // --------------------------------------------------------------------
   const saveFilesChangeInJSON = async (updatedFiles) => {
     try {
       const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
@@ -162,10 +152,9 @@ const DocumentDetail = () => {
         );
 
         if (fileIndex !== -1) {
-          // Actualizamos SOLO las imagenes
           filesData.archivos[fileIndex].imagenes = updatedFiles
-            .filter(f => f !== null) // solo rutas no-nulas
-            .map(file => file.split('/').pop()); // extrae nombre de archivo
+            .filter(f => f !== null)
+            .map(file => file.split('/').pop());
 
           await RNFS.writeFile(filesJsonPath, JSON.stringify(filesData));
         }
@@ -175,21 +164,14 @@ const DocumentDetail = () => {
     }
   };
 
-  // --------------------------------------------------------------------
-  // NO dejar salir si no hay principal
-  // --------------------------------------------------------------------
   const handleBack = () => {
     if (!documentFiles[0]) {
-      // No hay principal
       showCustomAlert('Error', 'No puedes salir sin un archivo principal.');
       return;
     }
     navigation.goBack();
   };
 
-  // --------------------------------------------------------------------
-  // Pedir confirmación para eliminar todo el documento
-  // --------------------------------------------------------------------
   const confirmDeleteDocument = () => {
     setShowDeleteConfirm(true);
   };
@@ -206,7 +188,6 @@ const DocumentDetail = () => {
         );
 
         if (fileIndex !== -1) {
-          // Quitamos todo el documento del JSON
           filesData.archivos.splice(fileIndex, 1);
           await RNFS.writeFile(filesJsonPath, JSON.stringify(filesData));
 
@@ -230,9 +211,27 @@ const DocumentDetail = () => {
     }
   };
 
-  // --------------------------------------------------------------------
-  // Abrir Cámara / Galería / Archivos con nombre único
-  // --------------------------------------------------------------------
+  // ------------------ NUEVO: Confirmación previa a borrar un archivo --------------
+  const confirmDeleteFile = (file, index) => {
+    // Aquí guardamos el archivo y el índice para la confirmación
+    setFileDeleteConfirm({ show: true, file, index });
+  };
+
+  // Si se confirma en la alerta, llamamos a la función original de borrado.
+  const handleConfirmDeleteFile = async () => {
+    if (fileDeleteConfirm.file && fileDeleteConfirm.index !== null) {
+      await deleteFile(fileDeleteConfirm.file, fileDeleteConfirm.index);
+    }
+    // Cerramos el modal
+    setFileDeleteConfirm({ show: false, file: null, index: null });
+  };
+
+  // Cancelar eliminar el archivo
+  const handleCancelDeleteFile = () => {
+    setFileDeleteConfirm({ show: false, file: null, index: null });
+  };
+  // --------------------------------------------------------------------------------
+
   const checkAndRequestPermission = async (permission) => {
     const result = await check(permission);
     switch (result) {
@@ -273,7 +272,7 @@ const DocumentDetail = () => {
       } else if (type === 'camera') {
         return await checkAndRequestPermission(PERMISSIONS.ANDROID.CAMERA);
       } else if (type === 'files') {
-        return true; // DocumentPicker no suele requerir permisos
+        return true;
       }
     }
   };
@@ -352,7 +351,9 @@ const DocumentDetail = () => {
     try {
       const result = await DocumentPicker.pick({ type: [DocumentPicker.types.allFiles] });
       if (result && result[0]) {
-        const originalExt = result[0].name ? '.' + result[0].name.split('.').pop().toLowerCase() : '.dat';
+        const originalExt = result[0].name
+          ? '.' + result[0].name.split('.').pop().toLowerCase()
+          : '.dat';
         const uniqueName = generateUniqueFilename(originalExt);
 
         const filePath = result[0].uri;
@@ -372,9 +373,6 @@ const DocumentDetail = () => {
     }
   };
 
-  // --------------------------------------------------------------------
-  // handleFileSelection => se actualiza JSON en ese momento
-  // --------------------------------------------------------------------
   const handleFileSelection = async (newFilePath) => {
     try {
       const updatedFiles = [...documentFiles];
@@ -385,7 +383,6 @@ const DocumentDetail = () => {
       }
       setDocumentFiles(updatedFiles);
 
-      // Guardar cambio inmediato en JSON
       await saveFilesChangeInJSON(updatedFiles);
       setIsActionSheetVisible(false);
     } catch (error) {
@@ -393,12 +390,9 @@ const DocumentDetail = () => {
     }
   };
 
-  // --------------------------------------------------------------------
-  // Eliminar UN archivo => se actualiza JSON en ese momento
-  // --------------------------------------------------------------------
+  // Función ORIGINAL de borrado de un archivo:
   const deleteFile = async (file, index) => {
     if (!file) return;
-
     try {
       if (await RNFS.exists(file)) {
         await RNFS.unlink(file);
@@ -407,9 +401,7 @@ const DocumentDetail = () => {
       updatedFiles[index] = null;
       setDocumentFiles(updatedFiles);
 
-      // Guardar cambio inmediato en JSON
       await saveFilesChangeInJSON(updatedFiles);
-
       showCustomAlert('Éxito', 'Archivo eliminado correctamente.', false);
     } catch (error) {
       console.error('Error al eliminar el archivo:', error);
@@ -417,9 +409,6 @@ const DocumentDetail = () => {
     }
   };
 
-  // --------------------------------------------------------------------
-  // Compartir un archivo
-  // --------------------------------------------------------------------
   const handleShare = async (file) => {
     if (!file) {
       showCustomAlert('Error', 'No hay archivo para compartir.');
@@ -471,9 +460,6 @@ const DocumentDetail = () => {
     }
   };
 
-  // --------------------------------------------------------------------
-  // Cambiar fecha (fecha de caducidad)
-  // --------------------------------------------------------------------
   const handleDateChange = (event, selectedDate) => {
     setShowDatePicker(false);
     if (selectedDate) {
@@ -481,15 +467,11 @@ const DocumentDetail = () => {
     }
   };
 
-  // --------------------------------------------------------------------
-  // handleFilePress: Actualizar el índice correctamente
-  // --------------------------------------------------------------------
   const handleFilePress = (file, index) => {
     if (!file) return;
 
     const isImage = /\.(jpg|jpeg|png)$/i.test(file);
     if (isImage) {
-      // Encontrar el índice en imagesForViewer
       const imageIndex = documentFiles
         .filter(f => f && /\.(jpg|jpeg|png)$/i.test(f))
         .findIndex(f => f === file);
@@ -511,9 +493,6 @@ const DocumentDetail = () => {
     }
   };
 
-  // --------------------------------------------------------------------
-  // handleActionSheetPress: Maneja las opciones del Action Sheet con retardo
-  // --------------------------------------------------------------------
   const handleActionSheetPress = (option) => {
     setIsActionSheetVisible(false);
     documentNameRef.current?.blur();
@@ -546,18 +525,14 @@ const DocumentDetail = () => {
         default:
           console.warn('Opción no reconocida en handleActionSheetPress:', option);
       }
-    }, 1000); // Retardo de 1 segundo
+    }, 1000);
   };
 
-  // --------------------------------------------------------------------
-  // BOTÓN GUARDAR => actualiza name, description, url, expiryDate
-  // --------------------------------------------------------------------
   const saveDocumentData = async () => {
     if (!name.trim()) {
       showCustomAlert('Error', 'El nombre del documento es obligatorio.');
       return;
     }
-    // Validamos que haya principal
     if (!documentFiles[0]) {
       showCustomAlert('Error', 'Se requiere un archivo principal.');
       return;
@@ -580,7 +555,6 @@ const DocumentDetail = () => {
         );
 
         if (fileIndex !== -1) {
-          // Actualizamos datos generales
           filesData.archivos[fileIndex] = {
             ...filesData.archivos[fileIndex],
             nombre: name,
@@ -588,7 +562,6 @@ const DocumentDetail = () => {
             url: url,
             expiryDate: expiryDate.toISOString(),
             share: share,
-            // "imagenes" ya se actualizó en cada cambio individual
           };
 
           await RNFS.writeFile(filesJsonPath, JSON.stringify(filesData));
@@ -603,9 +576,6 @@ const DocumentDetail = () => {
     }
   };
 
-  // --------------------------------------------------------------------
-  // RENDER archivo en pantalla
-  // --------------------------------------------------------------------
   const getFileType = (fileName) => {
     if (!fileName) return { icon: faFileAlt, color: '#6c757d' };
 
@@ -644,7 +614,6 @@ const DocumentDetail = () => {
     const label = index === 0 ? 'Principal/Anverso' : 'Secundario/Reverso';
 
     if (!file) {
-      // Mostrar ícono para agregar
       return (
         <View key={index} style={styles.documentSection}>
           <Text style={styles.sectionLabel}>{label}</Text>
@@ -661,7 +630,6 @@ const DocumentDetail = () => {
       );
     }
 
-    // Hay un archivo
     const { icon, color } = getFileType(file);
     const isImage = /\.(jpg|jpeg|png)$/i.test(file);
     return (
@@ -686,7 +654,11 @@ const DocumentDetail = () => {
             <FontAwesomeIcon icon={faEdit} size={20} color="#185abd" />
           </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => deleteFile(file, index)} style={styles.iconButton}>
+          {/* Aquí antes borrábamos el archivo directamente, ahora llamamos a confirmDeleteFile */}
+          <TouchableOpacity
+            onPress={() => confirmDeleteFile(file, index)}
+            style={styles.iconButton}
+          >
             <FontAwesomeIcon icon={faTrashAlt} size={20} color="#cc0000" />
           </TouchableOpacity>
 
@@ -698,16 +670,10 @@ const DocumentDetail = () => {
     );
   };
 
-  // --------------------------------------------------------------------
-  // Imagenes para el Visor
-  // --------------------------------------------------------------------
   const imagesForViewer = documentFiles
     .filter(file => file && /\.(jpg|jpeg|png)$/i.test(file))
     .map(file => ({ url: `file://${file}` }));
 
-  // --------------------------------------------------------------------
-  // Alertas personalizadas
-  // --------------------------------------------------------------------
   const showCustomAlert = (title, message, shouldNavigate = false) => {
     setAlertConfig({ title, message });
     setShowAlert(true);
@@ -725,9 +691,6 @@ const DocumentDetail = () => {
     return pattern.test(urlToCheck);
   };
 
-  // --------------------------------------------------------------------
-  // Header custom: Botón Back con validación y Botón Eliminar doc
-  // --------------------------------------------------------------------
   React.useLayoutEffect(() => {
     navigation.setOptions({
       headerLeft: () => (
@@ -743,17 +706,13 @@ const DocumentDetail = () => {
       title: 'Detalles del Documento',
       headerTitleStyle: styles.headerTitle,
       headerStyle: {
-        backgroundColor: '#185abd', // Color de fondo del encabezado
+        backgroundColor: '#185abd',
       },
     });
   }, [navigation, documentFiles]);
 
-  // --------------------------------------------------------------------
-  // Render principal
-  // --------------------------------------------------------------------
   return (
     <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
-      {/* Nombre */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Nombre del documento:</Text>
         <TextInput
@@ -766,13 +725,11 @@ const DocumentDetail = () => {
         />
       </View>
 
-      {/* Files */}
       <View style={styles.filesContainer}>
         {renderDocumentFile(documentFiles[0], 0)}
         {renderDocumentFile(documentFiles[1], 1)}
       </View>
 
-      {/* Descripción */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Comentario:</Text>
         <TextInput
@@ -786,7 +743,6 @@ const DocumentDetail = () => {
         />
       </View>
 
-      {/* URL */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Sitio web de consulta del documento:</Text>
         <View style={styles.urlContainer}>
@@ -802,13 +758,11 @@ const DocumentDetail = () => {
         </View>
       </View>
 
-      {/* Fecha de creación */}
       <View style={styles.inputContainer}>
         <Text style={styles.label}>Fecha de creación:</Text>
         <Text style={styles.creationDate}>{creationDate}</Text>
       </View>
 
-      {/* Fecha de caducidad + Switch “Archivar” */}
       <View style={styles.dateAndShareContainer}>
         <View style={styles.dateContainer}>
           <Text style={styles.label}>Fecha de caducidad:</Text>
@@ -836,30 +790,26 @@ const DocumentDetail = () => {
         </View>
       </View>
 
-      {/* Botón GUARDAR => solo actualiza datos textuales */}
       <TouchableOpacity style={styles.saveButton} onPress={saveDocumentData}>
         <FontAwesomeIcon icon={faSave} size={24} color="#fff" />
         <Text style={styles.saveButtonText}>Guardar</Text>
       </TouchableOpacity>
 
-      {/* Visor de imágenes */}
       <Modal
         visible={isImageViewerVisible}
         transparent={true}
         onRequestClose={() => setIsImageViewerVisible(false)}
       >
         <View style={styles.imageViewerContainer}>
-          {/* Botón "X" para cerrar el visor */}
           <TouchableOpacity
             onPress={() => setIsImageViewerVisible(false)}
-            style={styles.closeButton2} // Botón actualizado
+            style={styles.closeButton2}
           >
             <FontAwesomeIcon icon={faTimes} size={30} color="#fff" />
           </TouchableOpacity>
           <ImageViewer
             imageUrls={imagesForViewer}
             index={currentImageIndex}
-            supportedOrientations={['portrait', 'landscape']}
             enableSwipeDown
             doubleClickInterval={300}
             onSwipeDown={() => setIsImageViewerVisible(false)}
@@ -868,13 +818,12 @@ const DocumentDetail = () => {
                 <Text style={styles.indicatorText}>{`${currentIndex} / ${allSize}`}</Text>
               </View>
             )}
-            saveToLocalByLongPress={false} // Desactiva la opción de guardar imagen por largo clic
-            renderHeader={() => null} // Evita duplicar el botón de cierre
+            saveToLocalByLongPress={false}
+            renderHeader={() => null}
           />
         </View>
       </Modal>
 
-      {/* Modal para ActionSheet (Cámara, Galería, Archivos) */}
       <Modal visible={isActionSheetVisible} transparent={true} animationType="slide">
         <View style={styles.modalContainer}>
           <View style={styles.actionSheet}>
@@ -899,7 +848,6 @@ const DocumentDetail = () => {
         </View>
       </Modal>
 
-      {/* Alerta personalizada */}
       {showAlert && (
         <CustomAlert
           visible={showAlert}
@@ -910,28 +858,36 @@ const DocumentDetail = () => {
         />
       )}
 
-      {/* Alerta para confirmar borrado TOTAL */}
       {showDeleteConfirm && (
         <CustomAlert
           visible={showDeleteConfirm}
           onClose={() => setShowDeleteConfirm(false)}
           title="Confirmar"
           message="¿Seguro que desea eliminar este documento?"
-          showCancel={true} // Mostrará el botón “Cancelar”
-          onAccept={deleteDocument} // Acción al Aceptar
+          showCancel={true}
+          onAccept={deleteDocument}
           onCancel={() => {
             console.log('El usuario canceló la eliminación');
-            // Otras acciones si quieres
           }}
+        />
+      )}
+
+      {/* NUEVO: Alerta para confirmar borrado de archivo individual */}
+      {fileDeleteConfirm.show && (
+        <CustomAlert
+          visible={fileDeleteConfirm.show}
+          onClose={handleCancelDeleteFile}
+          title="Confirmar"
+          message="¿Seguro que desea eliminar este archivo?"
+          showCancel={true}
+          onAccept={handleConfirmDeleteFile}
+          onCancel={handleCancelDeleteFile}
         />
       )}
     </ScrollView>
   );
 };
 
-// --------------------------------------------------------------------
-// Estilos
-// --------------------------------------------------------------------
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -1093,7 +1049,7 @@ const styles = StyleSheet.create({
   },
   modalContainer: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)', // Fondo semitransparente
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
   },
   actionSheet: {
@@ -1126,11 +1082,11 @@ const styles = StyleSheet.create({
   },
   closeButton2: {
     position: 'absolute',
-    top: Platform.OS === 'ios' ? 50 : 20, // Ajusta según la plataforma
+    top: Platform.OS === 'ios' ? 50 : 20,
     right: 20,
-    zIndex: 1, // Asegura que esté sobre el visor
-    backgroundColor: 'rgba(0, 0, 0, 0.6)', // Fondo semitransparente
-    borderRadius: 20, // Botón redondeado
+    zIndex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
     width: 40,
     height: 40,
     justifyContent: 'center',
@@ -1138,7 +1094,7 @@ const styles = StyleSheet.create({
   },
   indicatorContainer: {
     position: 'absolute',
-    bottom: 20, // Ajusta según tu preferencia
+    bottom: 20,
     left: 0,
     right: 0,
     alignItems: 'center',
@@ -1146,7 +1102,7 @@ const styles = StyleSheet.create({
   indicatorText: {
     color: '#fff',
     fontSize: 16,
-    backgroundColor: 'rgba(0,0,0,0.4)', // Fondo semitransparente para mejor legibilidad
+    backgroundColor: 'rgba(0,0,0,0.4)',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 10,
