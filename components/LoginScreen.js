@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between'
   },
   keypadButton: {
-    width: 100,
+    width: 85,
     height: 50, 
     justifyContent: 'center',
     alignItems: 'center',
