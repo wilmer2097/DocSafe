@@ -43,8 +43,8 @@
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
-		<string>UIInterfaceOrientationLandscapeLeft</string>
-		<string>UIInterfaceOrientationLandscapeRight</string>
+		<!-- <string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string> -->
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
@@ -56,5 +56,8 @@
   <string>Se necesita acceso a la galería para seleccionar fotos.</string>
   <key>NSPhotoLibraryAddUsageDescription</key>
   <string>Se necesita acceso a la galería para seleccionar fotos.</string>
+  <key>UIFileSharingEnabled</key>
+  <true/>
+
 </dict>
 </plist>
