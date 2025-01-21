@@ -107,6 +107,28 @@ const DocumentDetail = () => {
     }
   }, [isImageViewerVisible]);
 
+  // Estado para controlar la alerta de recorte
+const [cropConfirm, setCropConfirm] = useState({
+  show: false,
+  originalImage: null, // objeto devuelto por ImagePicker
+  fileType: null,      // "principal" o "secondary"
+});
+const finalizeImageSelection = async (imagePath, fileType) => {
+  try {
+    const uniqueName = generateUniqueFilename('.jpg');
+    const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${uniqueName}`;
+
+    // Copiamos el archivo al destino final
+    await RNFS.copyFile(imagePath, destinationPath);
+
+    // Llamamos a la misma función que ya tenías para asignar
+    // (o podemos meter aquí la lógica de handleFileSelection directamente)
+    handleFileSelection(destinationPath, fileType);
+  } catch (error) {
+    console.error('[finalizeImageSelection] Error:', error);
+  }
+};
+
   useEffect(() => {
     const loadDocumentData = async () => {
       const filesJsonPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
@@ -281,67 +303,65 @@ const DocumentDetail = () => {
     if (isPicking) return;
     setIsPicking(true);
     Keyboard.dismiss();
-
+  
     try {
-      const imagen = await ImageCropPicker.openCamera({
-        cropping: true,
+      // 1) Obtener la imagen original (SIN recorte)
+      const originalImage = await ImageCropPicker.openCamera({
+        cropping: false,
         includeBase64: false,
-        freeStyleCropEnabled: true,
-        width: 3000,
-        height: 3000,
         compressImageQuality: 1.0,
       });
-      if (!imagen) return;
-
-      const uniqueName = generateUniqueFilename('.jpg');
-      const filePath = imagen.path;
-      const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${uniqueName}`;
-
-      await RNFS.copyFile(filePath, destinationPath);
-      handleFileSelection(destinationPath);
+      if (!originalImage) return;
+  
+      // 2) Mostramos el custom alert para preguntar si recortar
+      setCropConfirm({
+        show: true,
+        originalImage,
+        fileType,   // <-- "principal" o "secondary" (ver más abajo dónde se setea)
+      });
     } catch (error) {
       if (error?.code === 'E_PICKER_CANCELLED') {
         console.log('[abrirCamara] Usuario canceló la cámara.');
       } else {
-        console.error('Error capturando la imagen:', error);
+        console.error('[abrirCamara] Error al capturar imagen:', error);
       }
     } finally {
       setIsPicking(false);
     }
   };
+  
 
   const abrirGaleria = async () => {
     if (isPicking) return;
     setIsPicking(true);
     Keyboard.dismiss();
-
+  
     try {
-      const imagen = await ImageCropPicker.openPicker({
-        cropping: true,
+      // 1) Obtener la imagen original (SIN recorte)
+      const originalImage = await ImageCropPicker.openPicker({
+        cropping: false,
         includeBase64: false,
-        freeStyleCropEnabled: true,
-        width: 3000,
-        height: 3000,
         compressImageQuality: 1.0,
       });
-      if (!imagen) return;
-
-      const uniqueName = generateUniqueFilename('.jpg');
-      const filePath = imagen.path;
-      const destinationPath = `${RNFS.DocumentDirectoryPath}/DocSafe/${uniqueName}`;
-
-      await RNFS.copyFile(filePath, destinationPath);
-      handleFileSelection(destinationPath);
+      if (!originalImage) return;
+  
+      // 2) Mostramos el custom alert
+      setCropConfirm({
+        show: true,
+        originalImage,
+        fileType,  // "principal" o "secondary"
+      });
     } catch (error) {
       if (error?.code === 'E_PICKER_CANCELLED') {
         console.log('[abrirGaleria] Usuario canceló la galería.');
       } else {
-        console.error('Error seleccionando la imagen de la galería:', error);
+        console.error('[abrirGaleria] Error seleccionando imagen de galería:', error);
       }
     } finally {
       setIsPicking(false);
     }
   };
+  
 
   const abrirDocumentos = async () => {
     if (isPicking) return;
@@ -884,6 +904,51 @@ const DocumentDetail = () => {
           onCancel={handleCancelDeleteFile}
         />
       )}
+      {cropConfirm.show && (
+    <CustomAlert
+    visible={cropConfirm.show}
+    onClose={() => setCropConfirm({ ...cropConfirm, show: false })}
+    title="Recortar imagen"
+    message="¿Deseas recortar la imagen seleccionada?"
+    showCancel={true}
+    onAccept={async () => {
+      try {
+        // 1. abrir el cropper con la imagen original
+        const croppedImage = await ImageCropPicker.openCropper({
+          path: cropConfirm.originalImage.path,
+          freeStyleCropEnabled: true,
+          compressImageQuality: 1.0,
+        });
+        // 2. Copiar y asignar la imagen recortada
+        await finalizeImageSelection(croppedImage.path, cropConfirm.fileType);
+      } catch (error) {
+        if (error?.code === 'E_PICKER_CANCELLED') {
+          console.log('[CustomAlert] Usuario canceló recorte.');
+        } else {
+          console.error('[CustomAlert] Error en openCropper:', error);
+        }
+      } finally {
+        // Cerrar el alert
+        setCropConfirm({ ...cropConfirm, show: false });
+      }
+    }}
+    onCancel={async () => {
+      try {
+        // Si NO recorta, usamos la imagen original
+        await finalizeImageSelection(
+          cropConfirm.originalImage.path,
+          cropConfirm.fileType
+        );
+      } catch (error) {
+        console.error('[CustomAlert] Error al usar la imagen original:', error);
+      } finally {
+        // Cerrar el alert
+        setCropConfirm({ ...cropConfirm, show: false });
+      }
+    }}
+  />
+)}
+
     </ScrollView>
   );
 };

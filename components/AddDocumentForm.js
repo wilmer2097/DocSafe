@@ -187,7 +187,12 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
         return false;
     }
   };
-
+  const [cropConfirm, setCropConfirm] = useState({
+    show: false,
+    tipo: '',            // "principal" o "secondary"
+    originalImage: null, // objeto con path/mime
+  });
+  
   // ------------------------------
   // ACTION SHEET
   // ------------------------------
@@ -227,98 +232,98 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
   // ------------------------------
   // PICKERS (con nombre de archivo único)
   // ------------------------------
+
+  const handleFinalImage = (tipo, imagen) => {
+    // ejemplo de generación de nombre
+    const uniqueName = generateUniqueFilename('.jpg');
+  
+    if (tipo === 'principal') {
+      setPrincipalDocument({
+        uri: imagen.path,
+        name: uniqueName,
+        type: imagen.mime || 'image/jpeg',
+      });
+    } else if (tipo === 'secondary') {
+      setSecondaryDocument({
+        uri: imagen.path,
+        name: uniqueName,
+        type: imagen.mime || 'image/jpeg',
+      });
+    }
+  };
+
   const abrirCamara = async (tipo) => {
     if (isPicking) return;
     setIsPicking(true);
-
+  
+    // Cerrar teclado, etc.
     documentNameRef.current?.blur();
     descriptionRef.current?.blur();
     urTextlRef.current?.blur();
     Keyboard.dismiss();
-
+  
     try {
-      const imagen = await ImageCropPicker.openCamera({
-        cropping: true,
+      // 1. Obtener la imagen original (sin recorte)
+      const originalImage = await ImageCropPicker.openCamera({
+        cropping: false,
         includeBase64: false,
-        freeStyleCropEnabled: true,
-        width: 3000,
-        height: 3000,
         compressImageQuality: 1.0,
       });
-      if (!imagen) return;
-
-      const uniqueName = generateUniqueFilename('.jpg');
-
-      if (tipo === 'principal') {
-        setPrincipalDocument({
-          uri: imagen.path,
-          name: uniqueName,
-          type: imagen.mime,
-        });
-      } else if (tipo === 'secondary') {
-        setSecondaryDocument({
-          uri: imagen.path,
-          name: uniqueName,
-          type: imagen.mime,
-        });
-      }
+  
+      // 2. Mostrar CustomAlert para preguntar si recortar
+      setCropConfirm({
+        show: true,
+        tipo,          // "principal" o "secondary"
+        originalImage, // guardamos la imagen original para usarla luego
+      });
     } catch (error) {
       if (error?.code === 'E_PICKER_CANCELLED') {
         console.log('[abrirCamara] Usuario canceló la cámara.');
       } else {
-        console.log('Error al capturar la imagen con la cámara', error);
+        console.error('[abrirCamara] Error al capturar la imagen:', error);
       }
     } finally {
       setIsPicking(false);
     }
   };
+  
+  
 
   const abrirGaleria = async (tipo) => {
     if (isPicking) return;
     setIsPicking(true);
-
+  
     documentNameRef.current?.blur();
     descriptionRef.current?.blur();
     urTextlRef.current?.blur();
     Keyboard.dismiss();
-
+  
     try {
-      const imagen = await ImageCropPicker.openPicker({
-        cropping: true,
+      // 1. Obtener la imagen original (sin recorte)
+      const originalImage = await ImageCropPicker.openPicker({
+        cropping: false,
         includeBase64: false,
-        freeStyleCropEnabled: true,
-        width: 3000,
-        height: 3000,
         compressImageQuality: 1.0,
       });
-      if (!imagen) return;
-
-      const uniqueName = generateUniqueFilename('.jpg');
-
-      if (tipo === 'principal') {
-        setPrincipalDocument({
-          uri: imagen.path,
-          name: uniqueName,
-          type: imagen.mime,
-        });
-      } else if (tipo === 'secondary') {
-        setSecondaryDocument({
-          uri: imagen.path,
-          name: uniqueName,
-          type: imagen.mime,
-        });
-      }
+  
+      // 2. Mostrar CustomAlert para preguntar si recortar
+      setCropConfirm({
+        show: true,
+        tipo,          // "principal" o "secondary"
+        originalImage,
+      });
     } catch (error) {
       if (error?.code === 'E_PICKER_CANCELLED') {
-        console.log('[abrirGaleria] El usuario canceló la selección de la galería');
+        console.log('[abrirGaleria] Usuario canceló selección de galería.');
       } else {
-        console.log('Error al seleccionar la imagen de la galería', error);
+        console.error('[abrirGaleria] Error al seleccionar imagen:', error);
       }
     } finally {
       setIsPicking(false);
     }
   };
-
+  
+  
   const abrirSelectorDocumentos = async (tipo) => {
     if (isPicking) return;
     setIsPicking(true);
@@ -764,6 +769,46 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
           />
         </View>
       </Modal>
+      {cropConfirm.show && (
+      <CustomAlert
+        visible={cropConfirm.show}
+        onClose={() => setCropConfirm({ show: false, tipo: '', originalImage: null })}
+        title="Recortar imagen"
+        message="¿Deseas recortar la imagen seleccionada?"
+        showCancel={true}
+        // Si el usuario ACEPTA recortar
+        onAccept={async () => {
+          try {
+            // Llamamos a openCropper con la ruta original
+            const croppedImage = await ImageCropPicker.openCropper({
+              path: cropConfirm.originalImage.path,
+              freeStyleCropEnabled: true,
+              compressImageQuality: 1.0,
+            });
+
+            // guardamos la imagen recortada
+            handleFinalImage(cropConfirm.tipo, croppedImage);
+          } catch (cropErr) {
+            if (cropErr?.code === 'E_PICKER_CANCELLED') {
+              console.log('[CustomAlert] Usuario canceló recorte.');
+            } else {
+              console.error('[CustomAlert] Error en openCropper:', cropErr);
+            }
+          } finally {
+            // Ocultamos el alert
+            setCropConfirm({ show: false, tipo: '', originalImage: null });
+          }
+        }}
+        // Si el usuario CANCELA recortar
+        onCancel={() => {
+          // Guardar la imagen original sin recortar
+          handleFinalImage(cropConfirm.tipo, cropConfirm.originalImage);
+          // Cerrar el alert
+          setCropConfirm({ show: false, tipo: '', originalImage: null });
+        }}
+      />
+    )}
+
     </View>
   );
 };
