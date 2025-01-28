@@ -8,7 +8,8 @@ import {
   ActivityIndicator,
   Image,
   SafeAreaView,
-  Dimensions, ScrollView
+  ScrollView,
+  useWindowDimensions,
 } from 'react-native';
 import RNFS from 'react-native-fs';
 import { useFocusEffect } from '@react-navigation/native';
@@ -16,8 +17,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import { faKey, faBackspace, faFingerprint } from '@fortawesome/free-solid-svg-icons';
 import CustomAlert from './CustomAlert';
 import ReactNativeBiometrics from 'react-native-biometrics';
-
-const { width } = Dimensions.get('window');
 
 const LoginScreen = ({ navigation }) => {
   const [code, setCode] = useState('');
@@ -30,11 +29,11 @@ const LoginScreen = ({ navigation }) => {
   const [firstTime, setFirstTime] = useState(true);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertData, setAlertData] = useState({ title: '', message: '', token: '' });
+  const { width, height } = useWindowDimensions();
+  const isLandscape = width > height;
 
-  // Texto que se mostrará en el botón biométrico según el sensor disponible.
   const [sensorLabel, setSensorLabel] = useState('Iniciar sesión con biometría');
 
-  // Al montar el componente, verificamos el tipo de sensor biométrico disponible.
   useEffect(() => {
     const checkBiometry = async () => {
       const rnBiometrics = new ReactNativeBiometrics();
@@ -46,7 +45,6 @@ const LoginScreen = ({ navigation }) => {
         } else if (biometryType === 'TouchID') {
           setSensorLabel('Iniciar sesión con Touch ID');
         } else {
-          // Para la mayoría de dispositivos Android (y algunos iOS genéricos) será 'Biometrics'
           setSensorLabel('Iniciar sesión con huella digital');
         }
       } else {
@@ -115,7 +113,6 @@ const LoginScreen = ({ navigation }) => {
 
     try {
       if (firstTime) {
-        // Realizar la validación con el webhook solo si es la primera vez
         const loginData = {
           a: 'login_auth',
           correo: email,
@@ -149,7 +146,7 @@ const LoginScreen = ({ navigation }) => {
           setCode('');
           navigation.navigate('Home');
         } else {
-          setCode(''); // Limpia el código si es incorrecto
+          setCode('');
           if (result.message && result.message.toLowerCase().includes('correo ya registrado')) {
             showCustomAlert(
               'Cuenta existente',
@@ -160,12 +157,11 @@ const LoginScreen = ({ navigation }) => {
           }
         }
       } else {
-        // Validar de forma local si no es la primera vez
         if (code === savedCode) {
           setCode('');
           navigation.navigate('Home');
         } else {
-          setCode(''); // Limpia el código si es incorrecto
+          setCode('');
           showCustomAlert('Error', 'Código incorrecto. Inténtalo de nuevo.');
         }
       }
@@ -178,22 +174,18 @@ const LoginScreen = ({ navigation }) => {
   };
 
   const handleBiometricLogin = async () => {
-    // Verificamos si el usuario tiene habilitada la opción en su perfil.
     if (!biometricsEnabled) {
       showCustomAlert('Error', 'La autenticación biométrica no está habilitada en el perfil.');
       return;
     }
 
-    // Si el sensorLabel indica que no hay biometría disponible, también evitamos el prompt
     if (sensorLabel === 'Biometría no disponible') {
       showCustomAlert('Error', 'El dispositivo no cuenta con Face ID / Touch ID / huella configurada.');
       return;
     }
 
     try {
-      // Instanciamos ReactNativeBiometrics
       const rnBiometrics = new ReactNativeBiometrics();
-      // Pedimos la autenticación
       const { success } = await rnBiometrics.simplePrompt({
         promptMessage: 'Verifica tu identidad',
       });
@@ -209,104 +201,122 @@ const LoginScreen = ({ navigation }) => {
     }
   };
 
+  // Ajustes de dimensiones para los botones en función de la orientación
+  const buttonWidth = isLandscape ? width * 0.1 : width * 0.22; // Ancho más grande para hacerlos rectangulares
+  const buttonHeight = isLandscape ? width * 0.05 : width * 0.12; // Alto más pequeño
+  const buttonMargin = isLandscape ? width * 0.006 : width * 0.02;
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
-        <Text style={styles.docSafe}>Wallet DS</Text>
-        <Image
-          source={require('../src/presentation/assets/Logo.jpg')}
-          style={styles.profileImage}
-        />
-        {firstTime && (
-          <TextInput
-            style={styles.input}
-            placeholder="Ingrese su correo"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-          />
-        )}
-        <Text style={styles.title}>Ingresa tu Token ID</Text>
-        <View style={styles.codeContainer}>
-          {[...Array(4)].map((_, index) => (
-            <View key={index} style={styles.codeDot}>
-              {code[index] ? <View style={styles.codeFilledDot} /> : null}
+      <SafeAreaView style={styles.container}>
+        <View style={[styles.content, isLandscape && styles.landscapeContent]}>
+          <View style={[styles.leftContainer, isLandscape && styles.landscapeLeftContainer]}>
+            <Text style={styles.docSafe}>Wallet DS</Text>
+            <Image
+              source={require('../src/presentation/assets/Logo.jpg')}
+              style={styles.profileImage}
+            />
+            {firstTime && (
+              <TextInput
+                style={styles.input}
+                placeholder="Ingrese su correo"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+              />
+            )}
+            <Text style={styles.title}>Ingresa tu Token ID</Text>
+            <View style={styles.codeContainer}>
+              {[...Array(4)].map((_, index) => (
+                <View key={index} style={styles.codeDot}>
+                  {code[index] ? <View style={styles.codeFilledDot} /> : null}
+                </View>
+              ))}
             </View>
-          ))}
-        </View>
-        <View style={styles.keypadContainer}>
-          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'delete', 0, 'enter'].map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.keypadButton,
-                (item === 'delete' || item === 'enter') && styles.specialButton,
-              ]}
-              onPress={() => {
-                if (item === 'delete') handleDelete();
-                else if (item === 'enter') handleLogin();
-                else handlePress(item.toString());
-              }}
-              disabled={loading}
-            >
-              {item === 'delete' ? (
-                <FontAwesomeIcon icon={faBackspace} size={24} color="#fff" />
-              ) : item === 'enter' ? (
-                loading ? (
-                  <ActivityIndicator size="small" color="#fff" />
+          </View>
+          <View style={[styles.keypadContainer, isLandscape && styles.landscapeKeypadContainer]}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 'delete', 0, 'enter'].map((item, index) => (
+              <TouchableOpacity
+                key={index}
+                style={[
+                  styles.keypadButton,
+                  { width: buttonWidth, height: buttonHeight, margin: buttonMargin },
+                  (item === 'delete' || item === 'enter') && styles.specialButton,
+                ]}
+                onPress={() => {
+                  if (item === 'delete') handleDelete();
+                  else if (item === 'enter') handleLogin();
+                  else handlePress(item.toString());
+                }}
+                disabled={loading}
+              >
+                {item === 'delete' ? (
+                  <FontAwesomeIcon icon={faBackspace} size={24} color="#fff" />
+                ) : item === 'enter' ? (
+                  loading ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.keypadButtonText}>✓</Text>
+                  )
                 ) : (
-                  <Text style={styles.keypadButtonText}>✓</Text>
-                )
-              ) : (
-                <Text style={styles.keypadButtonText}>{item}</Text>
-              )}
+                  <Text style={styles.keypadButtonText}>{item}</Text>
+                )}
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity
+              style={styles.forgotPasswordButton}
+              onPress={() => navigation.navigate('ForgotPassword')}
+            >
+              <FontAwesomeIcon icon={faKey} size={20} color="#155abd" />
+              <Text style={styles.forgotPasswordText}>Recuperar Token ID</Text>
             </TouchableOpacity>
-          ))}
+            <TouchableOpacity
+              style={[
+                styles.biometricButton,
+                sensorLabel === 'Biometría no disponible' && { opacity: 0.5 },
+              ]}
+              onPress={handleBiometricLogin}
+              disabled={sensorLabel === 'Biometría no disponible'}
+            >
+              <FontAwesomeIcon icon={faFingerprint} size={24} color="#fff" />
+              <Text style={styles.biometricButtonText}>{sensorLabel}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
-        <TouchableOpacity
-          style={styles.forgotPasswordButton}
-          onPress={() => navigation.navigate('ForgotPassword')}
-        >
-          <FontAwesomeIcon icon={faKey} size={20} color="#155abd" />
-          <Text style={styles.forgotPasswordText}>Recuperar Token ID</Text>
-        </TouchableOpacity>
-        
-        {/* Botón biométrico */}
-        <TouchableOpacity
-          style={[
-            styles.biometricButton,
-            sensorLabel === 'Biometría no disponible' && { opacity: 0.5 },
-          ]}
-          onPress={handleBiometricLogin}
-          disabled={sensorLabel === 'Biometría no disponible'}
-        >
-          <FontAwesomeIcon icon={faFingerprint} size={24} color="#fff" />
-          <Text style={styles.biometricButtonText}>{sensorLabel}</Text>
-        </TouchableOpacity>
-      </View>
-      <CustomAlert
-        visible={alertVisible}
-        title={alertData.title}
-        message={alertData.message}
-        token={alertData.token}
-        onClose={() => setAlertVisible(false)}
-        onAccept={() => setAlertVisible(false)}
-      />
-    </SafeAreaView>
+        <CustomAlert
+          visible={alertVisible}
+          title={alertData.title}
+          message={alertData.message}
+          token={alertData.token}
+          onClose={() => setAlertVisible(false)}
+          onAccept={() => setAlertVisible(false)}
+        />
+      </SafeAreaView>
     </ScrollView>
   );
 };
 
-// Estilos
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f5f5f5' },
   content: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20
+    padding: 20,
+  },
+  landscapeContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  leftContainer: {
+    alignItems: 'center',
+  },
+  landscapeLeftContainer: {
+    flex: 1,
+    marginRight: 20,
   },
   scrollContent: {
     flexGrow: 1,
@@ -316,7 +326,7 @@ const styles = StyleSheet.create({
     fontSize: 40,
     color: '#155abd',
     fontWeight: 'bold',
-    marginBottom: 20
+    marginBottom: 20,
   },
   profileImage: {
     width: 120,
@@ -324,22 +334,22 @@ const styles = StyleSheet.create({
     borderRadius: 60,
     borderWidth: 3,
     borderColor: '#155abd',
-    marginBottom: 30
+    marginBottom: 30,
   },
   input: {
-    width: '80%',
+    width: 300,
     padding: 10,
     borderWidth: 1,
     borderColor: '#155abd',
     borderRadius: 10,
-    marginBottom: 20
+    marginBottom: 20,
   },
   title: { fontSize: 24, fontWeight: '600', color: '#333', marginBottom: 30 },
   codeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    width: 240, // Ajustado a tamaño fijo
-    marginBottom: 30
+    width: 240,
+    marginBottom: 10,
   },
   codeDot: {
     width: 20,
@@ -348,55 +358,57 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: '#155abd',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   codeFilledDot: {
     width: 12,
     height: 12,
     borderRadius: 6,
-    backgroundColor: '#155abd'
+    backgroundColor: '#155abd',
   },
   keypadContainer: {
     width: '90%',
     flexDirection: 'row',
     flexWrap: 'wrap',
-    justifyContent: 'space-between'
+    justifyContent: 'center',
+  },
+  landscapeKeypadContainer: {
+    width: '40%',
+    justifyContent: 'flex-center',
   },
   keypadButton: {
-    width: 85,
-    height: 50, 
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: '#155abd',
     borderRadius: 10,
-    margin: 5, 
   },
   specialButton: { backgroundColor: '#1e7eff' },
   keypadButtonText: { color: '#fff', fontSize: 24, fontWeight: '600' },
   forgotPasswordButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 30
+    marginTop: 10,
+    marginEnd: 20,
   },
   forgotPasswordText: {
     color: '#155abd',
     fontSize: 16,
     fontWeight: '600',
-    marginLeft: 10
+    marginLeft: 10,
   },
   biometricButton: {
-    marginTop: 20,
+    marginTop: 10,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#155abd',
     padding: 10,
-    borderRadius: 10
+    borderRadius: 10,
   },
   biometricButtonText: {
     color: '#fff',
     fontSize: 16,
     marginLeft: 10,
-    fontWeight: '600'
+    fontWeight: '600',
   },
 });
 

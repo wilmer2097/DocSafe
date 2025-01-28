@@ -1,16 +1,32 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, Linking, ScrollView } from 'react-native';
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  StyleSheet, 
+  Image, 
+  Dimensions, 
+  Linking, 
+  ScrollView, 
+  useWindowDimensions 
+} from 'react-native';
 import SwiperFlatList from 'react-native-swiper-flatlist';
 import { useNavigation } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
 import DeviceInfo from 'react-native-device-info';
 
-const { width, height } = Dimensions.get('window');
-
 const WelcomeScreen = () => {
   const navigation = useNavigation();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [appVersion, setAppVersion] = useState(""); // Estado para la versión de la app
+  const [appVersion, setAppVersion] = useState("");
+
+  // Obtenemos el ancho y alto actuales (recalcula al girar)
+  const { width: deviceWidth, height: deviceHeight } = useWindowDimensions();
+  const isLandscape = deviceWidth > deviceHeight;
+
+  // Definimos la altura del carrusel según la orientación
+  const carouselHeight = isLandscape ? deviceHeight * 0.4 : deviceHeight * 0.35;
+
   const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
 
   useEffect(() => {
@@ -25,8 +41,6 @@ const WelcomeScreen = () => {
     };
 
     checkIfLoggedIn();
-
-    // Obtener la versión de la app
     const version = DeviceInfo.getVersion();
     setAppVersion(version);
   }, []);
@@ -50,23 +64,37 @@ const WelcomeScreen = () => {
     require('../src/presentation/assets/image4.jpg'),
   ];
 
-  // Calcular la altura del carrusel en función del ancho de la pantalla
-  const carouselHeight = width * 0.6; // Ajusta este valor según la relación de aspecto que desees
-
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-      <View style={styles.container}>
-        <View style={styles.topContent}>
+    <ScrollView 
+      contentContainerStyle={styles.scrollContent} 
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={[styles.container, isLandscape && styles.landscapeContainer]}>
+        
+        {/* Contenido superior */}
+        <View style={[styles.topContent, isLandscape && styles.landscapeTopContent]}>
           <View style={styles.titleContainer}>
             <Text style={styles.title}>Bienvenido a Wallet DS</Text>
-            <Image source={require('../src/presentation/assets/Logo.jpg')} style={styles.logo} />
+            <Image 
+              source={require('../src/presentation/assets/Logo.jpg')} 
+              style={styles.logo} 
+            />
           </View>
 
           <Text style={styles.tagline}>
             Wallet DS © STEC{"\n"}Gestor documentos personales
           </Text>
 
-          <View style={[styles.carouselWrapper, { height: carouselHeight }]}>
+          {/* Carrusel con altura dinámica y ancho de la pantalla */}
+          <View 
+            style={[
+              styles.carouselWrapper, 
+              { 
+                width: deviceWidth, 
+                height: carouselHeight 
+              }
+            ]}
+          >
             <SwiperFlatList
               autoplay
               autoplayDelay={3}
@@ -79,10 +107,24 @@ const WelcomeScreen = () => {
               paginationStyleItem={styles.paginationItem}
               data={images}
               renderItem={({ item }) => (
-                <View style={[styles.carouselSlide, { width }]}>
+                <View 
+                  style={[
+                    styles.carouselSlide, 
+                    { 
+                      width: deviceWidth, 
+                      height: carouselHeight 
+                    }
+                  ]}
+                >
                   <Image
                     source={item}
-                    style={[styles.carouselImage, { width: width - 40, height: carouselHeight }]}
+                    style={[
+                      styles.carouselImage, 
+                      { 
+                        width: deviceWidth - 40, // deja 20px de margen a cada lado
+                        height: carouselHeight - 40, // ajusta la altura para mantener la relación de aspecto
+                      }
+                    ]}
                     resizeMode="contain"
                   />
                 </View>
@@ -91,15 +133,23 @@ const WelcomeScreen = () => {
           </View>
         </View>
 
-        <View style={styles.bottomContent}>
-          <Text style={styles.subtitle}>Protege y gestiona tus documentos de manera segura.</Text>
+        {/* Contenido inferior */}
+        <View style={[styles.bottomContent, isLandscape && styles.landscapeBottomContent]}>
+          <Text style={styles.subtitle}>
+            Protege y gestiona tus documentos de manera segura.
+          </Text>
 
           <TouchableOpacity style={styles.button} onPress={handleLoginPress}>
-            <Text style={styles.buttonText}>{isLoggedIn ? 'Ingresar' : 'Iniciar Sesión'}</Text>
+            <Text style={styles.buttonText}>
+              {isLoggedIn ? 'Ingresar' : 'Iniciar Sesión'}
+            </Text>
           </TouchableOpacity>
 
           {!isLoggedIn && (
-            <TouchableOpacity style={[styles.button, styles.createAccountButton]} onPress={handleCreateAccountPress}>
+            <TouchableOpacity 
+              style={[styles.button, styles.createAccountButton]} 
+              onPress={handleCreateAccountPress}
+            >
               <Text style={styles.buttonText}>Crear Cuenta</Text>
             </TouchableOpacity>
           )}
@@ -108,7 +158,6 @@ const WelcomeScreen = () => {
             <Text style={styles.optionButtonText}>Ir al Centro de Ayuda</Text>
           </TouchableOpacity>
 
-          {/* Mensaje de versión en la parte inferior */}
           <Text style={styles.versionText}>Versión {appVersion}</Text>
         </View>
       </View>
@@ -121,6 +170,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f5f5f5',
   },
+  landscapeContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+  },
   scrollContent: {
     flexGrow: 1,
     justifyContent: 'space-between',
@@ -130,18 +184,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  landscapeTopContent: {
+    width: '50%',
+    paddingRight: 10,
+  },
   bottomContent: {
     padding: 20,
     paddingBottom: 40,
     backgroundColor: '#f5f5f5',
     width: '100%',
   },
+  landscapeBottomContent: {
+    width: '50%',
+    paddingLeft: 10,
+    justifyContent: 'center',
+  },
   titleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 10,
-    marginTop: 20,
+    marginTop: 10,
   },
   title: {
     fontSize: 22,
@@ -162,18 +225,20 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 15,
   },
+
+  // Carrusel (estilo base, el alto lo pondremos dinámico en línea):
   carouselWrapper: {
-    marginTop: 20,
-    width: width,
-    marginBottom: 25,
+    marginTop: 10,
+    marginBottom: 15,
   },
   carouselSlide: {
     justifyContent: 'center',
     alignItems: 'center',
   },
   carouselImage: {
-    borderRadius: 10,
+    borderRadius: 30,
   },
+
   pagination: {
     bottom: -50,
   },
@@ -183,6 +248,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginHorizontal: 10,
   },
+
   subtitle: {
     fontSize: 16,
     color: '#333',
@@ -223,7 +289,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#888',
     textAlign: 'center',
-    marginTop: 20,
+    marginTop: 10,
   },
 });
 
