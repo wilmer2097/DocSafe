@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, Linking, ScrollView  } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Dimensions, Linking, ScrollView } from 'react-native';
 import SwiperFlatList from 'react-native-swiper-flatlist';
 import { useNavigation } from '@react-navigation/native';
 import RNFS from 'react-native-fs';
-import DeviceInfo from 'react-native-device-info'; 
+import DeviceInfo from 'react-native-device-info';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 
 const WelcomeScreen = () => {
   const navigation = useNavigation();
@@ -50,65 +50,68 @@ const WelcomeScreen = () => {
     require('../src/presentation/assets/image4.jpg'),
   ];
 
+  // Calcular la altura del carrusel en función del ancho de la pantalla
+  const carouselHeight = width * 0.6; // Ajusta este valor según la relación de aspecto que desees
+
   return (
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-    <View style={styles.container}>
-      <View style={styles.topContent}>
-        <View style={styles.titleContainer}>
-          <Text style={styles.title}>Bienvenido a DocSafe</Text>
-          <Image source={require('../src/presentation/assets/Logo.jpg')} style={styles.logo} />
+      <View style={styles.container}>
+        <View style={styles.topContent}>
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Bienvenido a Wallet DS</Text>
+            <Image source={require('../src/presentation/assets/Logo.jpg')} style={styles.logo} />
+          </View>
+
+          <Text style={styles.tagline}>
+            Wallet DS © STEC{"\n"}Gestor documentos personales
+          </Text>
+
+          <View style={[styles.carouselWrapper, { height: carouselHeight }]}>
+            <SwiperFlatList
+              autoplay
+              autoplayDelay={3}
+              autoplayLoop
+              index={0}
+              showPagination
+              paginationActiveColor="#155abd"
+              paginationDefaultColor="#ccc"
+              paginationStyle={styles.pagination}
+              paginationStyleItem={styles.paginationItem}
+              data={images}
+              renderItem={({ item }) => (
+                <View style={[styles.carouselSlide, { width }]}>
+                  <Image
+                    source={item}
+                    style={[styles.carouselImage, { width: width - 40, height: carouselHeight }]}
+                    resizeMode="contain"
+                  />
+                </View>
+              )}
+            />
+          </View>
         </View>
 
-        <Text style={styles.tagline}>
-          DocSafe © STEC{"\n"}Gestor documentos personales
-        </Text>
+        <View style={styles.bottomContent}>
+          <Text style={styles.subtitle}>Protege y gestiona tus documentos de manera segura.</Text>
 
-        <View style={styles.carouselWrapper}>
-          <SwiperFlatList
-            autoplay
-            autoplayDelay={3}
-            autoplayLoop
-            index={0}
-            showPagination
-            paginationActiveColor="#155abd"
-            paginationDefaultColor="#ccc"
-            paginationStyle={styles.pagination}
-            paginationStyleItem={styles.paginationItem}
-            data={images}
-            renderItem={({ item }) => (
-              <View style={[styles.carouselSlide, { width }]}>
-                <Image 
-                  source={item} 
-                  style={styles.carouselImage}
-                  resizeMode="cover"
-                />
-              </View>
-            )}
-          />
-        </View>
-      </View>
-
-      <View style={styles.bottomContent}>
-        <Text style={styles.subtitle}>Protege y gestiona tus documentos de manera segura.</Text>
-
-        <TouchableOpacity style={styles.button} onPress={handleLoginPress}>
-          <Text style={styles.buttonText}>{isLoggedIn ? 'Ingresar' : 'Iniciar Sesión'}</Text>
-        </TouchableOpacity>
-
-        {!isLoggedIn && (
-          <TouchableOpacity style={[styles.button, styles.createAccountButton]} onPress={handleCreateAccountPress}>
-            <Text style={styles.buttonText}>Crear Cuenta</Text>
+          <TouchableOpacity style={styles.button} onPress={handleLoginPress}>
+            <Text style={styles.buttonText}>{isLoggedIn ? 'Ingresar' : 'Iniciar Sesión'}</Text>
           </TouchableOpacity>
-        )}
 
-        <TouchableOpacity style={styles.optionButton} onPress={handleHelpCenterPress}>
-          <Text style={styles.optionButtonText}>Ir al Centro de Ayuda</Text>
-        </TouchableOpacity>
+          {!isLoggedIn && (
+            <TouchableOpacity style={[styles.button, styles.createAccountButton]} onPress={handleCreateAccountPress}>
+              <Text style={styles.buttonText}>Crear Cuenta</Text>
+            </TouchableOpacity>
+          )}
 
-        {/* Mensaje de versión en la parte inferior */}
-        <Text style={styles.versionText}>Versión {appVersion}</Text>
+          <TouchableOpacity style={styles.optionButton} onPress={handleHelpCenterPress}>
+            <Text style={styles.optionButtonText}>Ir al Centro de Ayuda</Text>
+          </TouchableOpacity>
+
+          {/* Mensaje de versión en la parte inferior */}
+          <Text style={styles.versionText}>Versión {appVersion}</Text>
+        </View>
       </View>
-    </View>
     </ScrollView>
   );
 };
@@ -160,19 +163,15 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   carouselWrapper: {
-    marginTop: 100,
+    marginTop: 20,
     width: width,
-    height: 200,
     marginBottom: 25,
   },
   carouselSlide: {
-    height: 200,
     justifyContent: 'center',
     alignItems: 'center',
   },
   carouselImage: {
-    width: width - 40,
-    height: '100%',
     borderRadius: 10,
   },
   pagination: {

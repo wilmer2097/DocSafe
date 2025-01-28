@@ -213,7 +213,7 @@ const LoginScreen = ({ navigation }) => {
     <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
     <SafeAreaView style={styles.container}>
       <View style={styles.content}>
-        <Text style={styles.docSafe}>DocSafe</Text>
+        <Text style={styles.docSafe}>Wallet DS</Text>
         <Image
           source={require('../src/presentation/assets/Logo.jpg')}
           style={styles.profileImage}

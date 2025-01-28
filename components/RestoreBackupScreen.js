@@ -127,7 +127,7 @@ const RestoreBackupScreen = () => {
             await RNFS.moveFile(jsonSource, jsonDestination);
             console.log(`Archivo JSON movido a assets: ${file.name}`);
           } else {
-            console.log(`Archivo multimedia mantenido en DocSafe: ${file.name}`);
+            console.log(`Archivo multimedia mantenido en Wallet DS: ${file.name}`);
           }
         }
 
@@ -191,7 +191,7 @@ const RestoreBackupScreen = () => {
           await RNFS.moveFile(sourcePath, destinationPath);
           console.log(`Archivo JSON movido a assets: ${file.name}`);
         } else {
-          console.log(`Archivo multimedia mantenido en DocSafe: ${file.name}`);
+          console.log(`Archivo multimedia mantenido en Wallet DS: ${file.name}`);
         }
       }
 

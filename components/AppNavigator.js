@@ -63,7 +63,7 @@ const CustomDrawerContent = (props) => {
           <Image source={profile.profileImage} style={styles.profileImage} />
         </TouchableOpacity>
         <Text style={styles.profileName}>{profile.name}</Text>
-        <Text style={styles.profileRole}>DocSafe</Text>
+        <Text style={styles.profileRole}>Wallet DS</Text>
       </View>
 
       <View style={styles.menuItems}>
@@ -146,7 +146,7 @@ const DrawerNavigator = () => {
       }}
     >
       <Drawer.Screen 
-        name="DocSafe" 
+        name="Wallet DS" 
         component={HomeScreen}
         options={{
           title: 'Documentos',
