@@ -508,7 +508,7 @@ const ProfileScreen = ({ navigation, route }) => {
     setAlertVisible(false);
     if (alertData.title === 'Éxito' && alertData.token) {
       // Por ejemplo: navega al Login si así lo quieres
-      
+      navigation.navigate('Login');
     }
   };
 
