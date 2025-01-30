@@ -50,7 +50,7 @@ const WelcomeScreen = () => {
   };
 
   const handleCreateAccountPress = () => {
-    navigation.navigate('Profile');
+    navigation.navigate('Profile',{ fromWelcome: true });
   };
 
   const handleHelpCenterPress = () => {
