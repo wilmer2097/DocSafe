@@ -7,11 +7,11 @@ const ForgotPasswordScreen = ({ navigation }) => {
   const [email, setEmail] = useState('');
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertData, setAlertData] = useState({ title: '', message: '', token: null });
-  const [isSuccess, setIsSuccess] = useState(false); // Nueva bandera para determinar si el proceso fue exitoso
+  const [isSuccess, setIsSuccess] = useState(false); // Para determinar si el proceso fue exitoso
 
   const showCustomAlert = (title, message, token = null, success = false) => {
     setAlertData({ title, message, token });
-    setIsSuccess(success); // Establece si la alerta es exitosa o no
+    setIsSuccess(success);
     setAlertVisible(true);
   };
 
@@ -19,7 +19,18 @@ const ForgotPasswordScreen = ({ navigation }) => {
     const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
 
     try {
-      // Leer el archivo JSON local
+      // Verificamos primero si existe el archivo:
+      const exists = await RNFS.exists(profilePath);
+      if (!exists) {
+        // No hay cuenta registrada
+        showCustomAlert(
+          'Cuenta inexistente',
+          'No se encontró ninguna cuenta registrada. Por favor, crea una cuenta antes de intentar recuperar el Token.'
+        );
+        return;
+      }
+
+      // Si existe, lo leemos:
       const profileData = await RNFS.readFile(profilePath);
       const userProfile = JSON.parse(profileData).perfilUsuario;
 
@@ -29,11 +40,15 @@ const ForgotPasswordScreen = ({ navigation }) => {
         showCustomAlert('Token ID Encontrado', 'Tu token es:', userProfile.loginCode, true);
       } else {
         // Mostrar error si el correo no coincide
-        showCustomAlert('Error', 'Correo electrónico no encontrado.');
+        showCustomAlert(
+          'Error',
+          'El correo electrónico ingresado no coincide con ninguna cuenta registrada en este dispositivo.'
+        );
       }
-      
+
     } catch (error) {
       console.error('Error:', error);
+      // Manejamos cualquier otro error genérico aquí
       showCustomAlert('Error', 'Ocurrió un problema al procesar la solicitud.');
     }
   };
@@ -41,7 +56,8 @@ const ForgotPasswordScreen = ({ navigation }) => {
   const handleAccept = () => {
     setAlertVisible(false);
     if (isSuccess) {
-      navigation.navigate('Login'); // Navegar a la pantalla de Login solo si fue exitoso
+      // Navegar a la pantalla de Login solo si fue exitoso
+      navigation.navigate('Login');
     }
   };
 
