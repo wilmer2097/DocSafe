@@ -103,14 +103,14 @@ const LoginScreen = ({ navigation }) => {
       showCustomAlert('Error', 'Debe ingresar un código de 4 dígitos.');
       return;
     }
-
+  
     if (firstTime && email.trim() === '') {
       showCustomAlert('Error', 'Por favor, ingrese su correo electrónico.');
       return;
     }
-
+  
     setLoading(true);
-
+  
     try {
       if (firstTime) {
         const loginData = {
@@ -118,13 +118,13 @@ const LoginScreen = ({ navigation }) => {
           correo: email,
           tec_ope_pass: code,
         };
-
+  
         const response = await fetch('https://biblioteca1.info/docsafe/api/registrar_users.php', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(loginData),
         });
-
+  
         const result = await response.json();
         if (response.ok && result.success === true) {
           const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
@@ -139,6 +139,7 @@ const LoginScreen = ({ navigation }) => {
               correo: result.cliente_data.correo,
               biometricsEnabled: biometricsEnabled,
               clienteId: result.cliente_data.cliente_id,
+              prefijo: result.cliente_data.prefijo || '51', // Guarda el prefijo
             },
           };
           await RNFS.writeFile(profilePath, JSON.stringify(profileData));
