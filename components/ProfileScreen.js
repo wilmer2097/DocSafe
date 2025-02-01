@@ -11,7 +11,7 @@ import {
   Modal,
   TouchableWithoutFeedback,
   Linking,
-  Switch
+  Switch,
 } from 'react-native';
 import RNFS from 'react-native-fs';
 import ReactNativeBiometrics from 'react-native-biometrics';
@@ -21,9 +21,6 @@ import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import CheckBox from '@react-native-community/checkbox';
 import * as RNLocalize from 'react-native-localize';
 
-// ---------------------------------------------------
-// Lista de "países" (picker) para ambos modales
-// ---------------------------------------------------
 const countryDataList = [
   { dial_code: '1', flag: '🇺🇸', name: 'Estados Unidos' },
   { dial_code: '51', flag: '🇵🇪', name: 'Perú' },
@@ -47,12 +44,9 @@ const countryDataList = [
   { dial_code: '597', flag: '🇸🇷', name: 'Surinam' },
   { dial_code: '598', flag: '🇺🇾', name: 'Uruguay' },
   { dial_code: '34', flag: '🇪🇸', name: 'España' },
-
 ];
 
-// ---------------------------------------------------
 // Mapa de región del dispositivo a prefijo
-// ---------------------------------------------------
 const countryCodeMap = {
   US: '1',
   PE: '51',
@@ -79,74 +73,52 @@ const countryCodeMap = {
 };
 
 const ProfileScreen = ({ navigation, route }) => {
-  /**
-   * fromWelcome = true  => Pantalla abierta tras "Crear Cuenta" (WelcomeScreen)
-   * fromWelcome = false => Pantalla abierta desde otra parte de la app
-   */
   const { fromWelcome = false } = route.params || {};
 
+  // Estado del perfil
   const [profile, setProfile] = useState({
     name: '',
     profileImage: null,
     loginCode: '',
     ciudad: '',
     telefono: '',
-    prefijo: '51', // Campo para la API (en lugar de codigoPais)
+    prefijo: '51',
     correo: '',
     biometricsEnabled: false,
     fec_ini: '',
     fec_fin: '',
     termsAccepted: false,
     clienteId: '',
+    internetEnabled: true,
   });
 
-  // Indica si el perfil no existía localmente
   const [firstTime, setFirstTime] = useState(true);
-
-  // Indica si el usuario ya existe en la BD (tras "login_second")
   const [isExistingUser, setIsExistingUser] = useState(false);
-
-  // Ruta local del JSON donde guardamos el perfil
   const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
 
-  // Manejo de errores
   const [errorTelefono, setErrorTelefono] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  // Alert personalizado
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertData, setAlertData] = useState({ title: '', message: '', token: '' });
 
-  // Country Picker (principal)
   const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState({ flag: '🇵🇪', dial_code: '51' });
-
-  // Guardamos el loginCode inicial (para saber si cambió y si redirigir)
-  const [initialLoginCode, setInitialLoginCode] = useState('');
-
-  // Modal #1: Pregunta "¿Actualizar o crear nueva?"
   const [showFirstModal, setShowFirstModal] = useState(false);
-
-  // Modal #2: Validación con login_second (correo + prefijo + teléfono)
   const [showValidationModal, setShowValidationModal] = useState(false);
-
-  // En el modal #2, también usamos un picker para el prefijo
   const [showCountryPickerValidation, setShowCountryPickerValidation] = useState(false);
-  const [tempSelectedCountry, setTempSelectedCountry] = useState({ flag: '🇵🇪', dial_code: '51' });
 
+  const [tempSelectedCountry, setTempSelectedCountry] = useState({ flag: '🇵🇪', dial_code: '51' });
   const [tempEmail, setTempEmail] = useState('');
   const [tempPhone, setTempPhone] = useState('');
 
-  // ------------------------------------------------------------------
-  // Al montar el componente:
-  //  1) Leemos el perfil local. Si existe, lo cargamos al state.
-  //  2) Si fromWelcome = true => abrimos el modal #1
-  // ------------------------------------------------------------------
+  const [initialLoginCode, setInitialLoginCode] = useState('');
+
+  // Efecto de carga del perfil local
   useEffect(() => {
     const loadProfile = async () => {
       try {
-        const profileExists = await RNFS.exists(profilePath);
-        if (profileExists) {
+        const exists = await RNFS.exists(profilePath);
+        if (exists) {
           const profileData = await RNFS.readFile(profilePath);
           const savedProfile = JSON.parse(profileData).perfilUsuario;
 
@@ -154,61 +126,44 @@ const ProfileScreen = ({ navigation, route }) => {
           setInitialLoginCode(savedProfile.loginCode);
 
           if (savedProfile.prefijo) {
-            const countryData = countryDataList.find(
-              (c) => c.dial_code === savedProfile.prefijo
-            );
-            if (countryData) {
-              setSelectedCountry({
-                flag: countryData.flag,
-                dial_code: countryData.dial_code,
-              });
+            const cd = countryDataList.find((c) => c.dial_code === savedProfile.prefijo);
+            if (cd) {
+              setSelectedCountry({ flag: cd.flag, dial_code: cd.dial_code });
             }
           }
           setFirstTime(false);
         } else {
-          // No existe perfil => set defaults
           const deviceCountry = RNLocalize.getCountry() || 'PE';
           const devicePrefix = countryCodeMap[deviceCountry] || '51';
-
           setProfile((prev) => ({ ...prev, prefijo: devicePrefix }));
 
-          const countryData = countryDataList.find((c) => c.dial_code === devicePrefix);
-          if (countryData) {
-            setSelectedCountry({ flag: countryData.flag, dial_code: devicePrefix });
+          const cd = countryDataList.find((c) => c.dial_code === devicePrefix);
+          if (cd) {
+            setSelectedCountry({ flag: cd.flag, dial_code: devicePrefix });
           }
           setFirstTime(true);
         }
 
-        // Si venimos de WelcomeScreen, mostramos modal #1
         if (fromWelcome) {
           setShowFirstModal(true);
         }
-      } catch (error) {
-        console.error('Error loading profile:', error);
-        showCustomAlert('Error', 'Error al cargar el perfil: ' + error.message);
+      } catch (err) {
+        console.error('Error loading profile:', err);
+        showCustomAlert('Error', 'Error al cargar el perfil: ' + err.message);
       }
     };
     loadProfile();
   }, [fromWelcome]);
 
-  // --------------------------------------------------------------------
-  // setProfile con callback
-  // --------------------------------------------------------------------
-  const handleChange = (key, value) => {
-    setProfile((prev) => ({ ...prev, [key]: value }));
-  };
-
-  // --------------------------------------------------------------------
-  // showCustomAlert
-  // --------------------------------------------------------------------
   const showCustomAlert = (title, message, token = '') => {
     setAlertData({ title, message, token });
     setAlertVisible(true);
   };
 
-  // --------------------------------------------------------------------
-  // Biometría
-  // --------------------------------------------------------------------
+  const handleChange = (key, value) => {
+    setProfile((prev) => ({ ...prev, [key]: value }));
+  };
+
   const toggleBiometrics = async (enabled) => {
     const rnBiometrics = new ReactNativeBiometrics();
     try {
@@ -216,7 +171,6 @@ const ProfileScreen = ({ navigation, route }) => {
         const { success } = await rnBiometrics.simplePrompt({
           promptMessage: 'Confirma tu identidad para habilitar la autenticación biométrica',
         });
-
         if (success) {
           setProfile((prev) => ({ ...prev, biometricsEnabled: true }));
           showCustomAlert('', 'Autenticación biométrica habilitada.');
@@ -227,103 +181,100 @@ const ProfileScreen = ({ navigation, route }) => {
         setProfile((prev) => ({ ...prev, biometricsEnabled: false }));
         showCustomAlert('', 'Autenticación biométrica deshabilitada.');
       }
-    } catch (error) {
-      console.error('Error al verificar autenticación biométrica:', error);
-      showCustomAlert(
-        'Error',
-        'Autenticación biométrica no disponible en este dispositivo o no se completó.'
-      );
+    } catch (err) {
+      console.error('Error:', err);
+      showCustomAlert('Error', 'Autenticación biométrica no disponible.');
       setProfile((prev) => ({ ...prev, biometricsEnabled: false }));
     }
   };
 
-  // --------------------------------------------------------------------
-  // handleSaveProfile
-  //   - Insert => "a": "I", "ope_estado_id": 2, "fec_cre", ...
-  //   - Update => "a": "U", "ope_estado_id": 1, "fec_mod", ...
-  // --------------------------------------------------------------------
+  const toggleInternetMode = async (enabled) => {
+    setProfile((prev) => ({ ...prev, internetEnabled: enabled }));
+    try {
+      const updatedProfile = { ...profile, internetEnabled: enabled };
+      await RNFS.writeFile(profilePath, JSON.stringify({ perfilUsuario: updatedProfile }), 'utf8');
+    } catch (err) {
+      console.error('Error saving internetEnabled:', err);
+      showCustomAlert('Error', 'No se pudo guardar la preferencia de internet.');
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (isSubmitting) return;
-
-    // Convertir a minúsculas
+  
+    const useCloud = profile.internetEnabled;
+  
     if (profile.correo) profile.correo = profile.correo.toLowerCase();
     if (profile.name) profile.name = profile.name.toLowerCase();
     if (profile.ciudad) profile.ciudad = profile.ciudad.toLowerCase();
-
-    // Validación de términos
+  
     if (!profile.termsAccepted) {
-      showCustomAlert('Error', 'Debes aceptar los términos y condiciones para continuar.');
+      showCustomAlert('Error', 'Debes aceptar los términos y condiciones.');
       return;
     }
-
+  
     setIsSubmitting(true);
-
-    // Validaciones
+  
     if (!profile.name.trim()) {
       showCustomAlert('Error', 'El nombre es obligatorio.');
       setIsSubmitting(false);
       return;
     }
     if (!validateEmail(profile.correo)) {
-      showCustomAlert('Error', 'Por favor ingresa un correo electrónico válido.');
+      showCustomAlert('Error', 'Correo electrónico inválido.');
       setIsSubmitting(false);
       return;
     }
     if (!validateTelefono(profile.telefono)) {
+      showCustomAlert('Error', 'El número de teléfono debe ser 9 dígitos.');
       setIsSubmitting(false);
-      showCustomAlert('Error', 'El número de teléfono debe tener 9 dígitos (solo números).');
       return;
     }
     if (!validateLoginCode(profile.loginCode)) {
-      setIsSubmitting(false);
       showCustomAlert('Error', 'El código de acceso debe tener 4 dígitos numéricos.');
+      setIsSubmitting(false);
       return;
     }
-
-    // Si NO venimos de WelcomeScreen => guardado local
-    if (!fromWelcome) {
+  
+    if (!useCloud) {
       await saveProfileLocally(profile);
       setIsSubmitting(false);
       showCustomAlert('Guardado', 'Tus datos se han guardado localmente.');
       return;
     }
-
-    // Venimos de WelcomeScreen => Insertar/Actualizar en la nube
+  
     try {
       const currentDate = new Date();
-      // Formato YYYY-MM-DD
       const today = currentDate.toISOString().split('T')[0];
-
-      // Ejemplo: Sumamos +6 meses
+  
       const endDateObj = new Date(currentDate);
       endDateObj.setMonth(endDateObj.getMonth() + 6);
       const endDate = endDateObj.toISOString().split('T')[0];
-
-      // Si isExistingUser => Update ("U"), si no => Insert ("I")
-      const actionType = isExistingUser ? 'U' : 'I';
-
+  
+      let actionType = isExistingUser ? 'U' : 'I';
+      if (!fromWelcome) actionType = 'U';
+  
       let datosPerfil = {};
-
+  
       if (actionType === 'I') {
         datosPerfil = {
           a: 'I',
           tec_prf_id: 13,
-          ope_estado_id: 2, // Insert => 2 (según tu especificación)
+          ope_estado_id: 1,
           correo: profile.correo,
-          tec_ope_pass: profile.loginCode,
+          tec_ope_pass: profile.loginCode || '', // Asegúrate de que no sea null
           nombre: profile.name,
           telefono: profile.telefono,
           ciudad: profile.ciudad,
           fec_cre: today,
-          fec_ini: today,   // O el que desees (por ejemplo, '2025-02-01')
-          fec_fin: endDate, // Por ejemplo
+          fec_ini: today,
+          fec_fin: endDate,
           prefijo: parseInt(profile.prefijo, 10),
         };
       } else {
-        // Update
         datosPerfil = {
           a: 'U',
-          cliente_id: profile.clienteId, // O el que retornó en la validación
+          cliente_id: profile.clienteId || '', // Asegúrate de que cliente_id no sea undefined
           fec_mod: today,
           nombre: profile.name,
           correo: profile.correo,
@@ -332,11 +283,14 @@ const ProfileScreen = ({ navigation, route }) => {
           prefijo: parseInt(profile.prefijo, 10),
           fec_ini: profile.fec_ini || today,
           fec_fin: profile.fec_fin || endDate,
-          ope_estado_id: 1, // Update => 1 (ejemplo en tu JSON)
-          tec_ope_pass: profile.loginCode,
+          ope_estado_id: 1,
+          tec_ope_pass: profile.loginCode || '', // Asegúrate de que no sea null
         };
       }
-
+  
+      // Imprimir en consola los datos que se enviarán a la API
+      console.log('Datos enviados a la API:', JSON.stringify(datosPerfil, null, 2));
+  
       const response = await fetch(
         'https://biblioteca1.info/docsafe/api/registrar_users.php',
         {
@@ -345,23 +299,35 @@ const ProfileScreen = ({ navigation, route }) => {
           body: JSON.stringify(datosPerfil),
         }
       );
-
-      const result = await response.json();
+  
+      const responseText = await response.text();
+      let result;
+  
+      try {
+        result = JSON.parse(responseText);
+      } catch (parseErr) {
+        console.error('Error al parsear JSON:', parseErr);
+        console.error('Texto devuelto por el servidor:', responseText);
+        showCustomAlert(
+          'Error en el servidor',
+          'La respuesta del servidor no es un JSON válido. Detalles: ' + responseText
+        );
+        setIsSubmitting(false);
+        return;
+      }
+  
       if (response.ok && result.success === true) {
-        // Se actualizaron/insertaron datos
-        // La respuesta viene en result.cliente_data
         const { cliente_data } = result;
-
-        // Actualizar profile con lo que retornó
-        // (p. ej. "cliente_id", "fec_cre", etc.)
+  
+        // Actualiza el estado profile con los datos de la API
         setProfile((prev) => ({
           ...prev,
           ...cliente_data,
-          // Aseguramos convertir prefijo a string para el picker
           prefijo: String(cliente_data.prefijo),
+          loginCode: cliente_data.tec_ope_pass || prev.loginCode, // Actualiza loginCode
+          clienteId: cliente_data.cliente_id || prev.clienteId, // Actualiza clienteId
         }));
-
-        // Actualizar picker de país
+  
         const foundCountry = countryDataList.find(
           (c) => c.dial_code === String(cliente_data.prefijo)
         );
@@ -371,14 +337,15 @@ const ProfileScreen = ({ navigation, route }) => {
             dial_code: foundCountry.dial_code,
           });
         }
-
-        // Guardar local
+  
         await saveProfileLocally({
           ...profile,
           ...cliente_data,
           prefijo: String(cliente_data.prefijo),
+          loginCode: cliente_data.tec_ope_pass || profile.loginCode, // Guarda loginCode
+          clienteId: cliente_data.cliente_id || profile.clienteId, // Guarda clienteId
         });
-
+  
         const tokenChanged = initialLoginCode !== profile.loginCode;
         showCustomAlert(
           'Éxito',
@@ -388,43 +355,55 @@ const ProfileScreen = ({ navigation, route }) => {
       } else {
         showCustomAlert('Error', result.message || 'Hubo un problema al registrar el usuario.');
       }
-    } catch (error) {
-      showCustomAlert('Error', 'Hubo un problema al procesar el registro: ' + error.message);
+    } catch (err) {
+      showCustomAlert('Error', 'Hubo un problema al procesar el registro: ' + err.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  // --------------------------------------------------------------------
-  // Guardar en JSON local
-  // --------------------------------------------------------------------
   const saveProfileLocally = async (profileData) => {
     try {
+      // Filtramos los campos que no deseamos guardar
+      const {
+        tec_ope_pass,
+        tec_prf_id,
+        ope_estado_id,
+        nombre,
+        fec_cre,
+        cliente_id,
+        tec_ope_id,
+        ...filteredProfile
+      } = profileData;
+  
+      // Guardamos solo los campos necesarios
       await RNFS.writeFile(
         profilePath,
-        JSON.stringify({ perfilUsuario: profileData }),
+        JSON.stringify({ perfilUsuario: filteredProfile }),
         'utf8'
       );
-    } catch (error) {
-      console.error('Error saving profile locally:', error);
+    } catch (err) {
+      console.error('Error saving profile locally:', err);
       showCustomAlert('Error', 'No se pudo guardar el perfil localmente.');
     }
   };
 
-  // --------------------------------------------------------------------
-  // Abrir modal #2 => validación con "login_second"
-  // --------------------------------------------------------------------
   const handleOpenValidationModal = () => {
+    if (!profile.internetEnabled) {
+      showCustomAlert('Modo sin Internet', 'Debes habilitar internet para validar cuenta.');
+      return;
+    }
     setTempEmail('');
     setTempPhone('');
     setTempSelectedCountry({ flag: '🇵🇪', dial_code: '51' });
     setShowValidationModal(true);
   };
 
-  // --------------------------------------------------------------------
-  // fetchExistingData => "login_second"
-  // --------------------------------------------------------------------
   const fetchExistingData = async () => {
+    if (!profile.internetEnabled) {
+      showCustomAlert('Modo sin Internet', 'Debes habilitar internet para validar cuenta.');
+      return;
+    }
     try {
       const body = {
         a: 'login_second',
@@ -433,20 +412,22 @@ const ProfileScreen = ({ navigation, route }) => {
         telefono: tempPhone,
       };
 
-      const response = await fetch(
-        'https://biblioteca1.info/docsafe/api/registrar_users.php',
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        }
-      );
+      const resp = await fetch('https://biblioteca1.info/docsafe/api/registrar_users.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const textResp = await resp.text();
+      let data;
+      try {
+        data = JSON.parse(textResp);
+      } catch (e) {
+        showCustomAlert('Error', 'No se pudo parsear la respuesta del servidor: ' + textResp);
+        return;
+      }
 
-      const data = await response.json();
-      if (response.ok && data.success) {
+      if (resp.ok && data.success) {
         const { cliente_data } = data;
-
-        // Autocompletar en el perfil
         setProfile((prev) => ({
           ...prev,
           name: cliente_data.nombre || prev.name,
@@ -459,62 +440,53 @@ const ProfileScreen = ({ navigation, route }) => {
           clienteId: cliente_data.cliente_id || prev.clienteId,
         }));
 
-        // Actualizar el picker principal si cambió prefijo
-        const foundCountry = countryDataList.find(
+        const foundC = countryDataList.find(
           (c) => c.dial_code === String(cliente_data.prefijo)
         );
-        if (foundCountry) {
+        if (foundC) {
           setSelectedCountry({
-            flag: foundCountry.flag,
-            dial_code: foundCountry.dial_code,
+            flag: foundC.flag,
+            dial_code: foundC.dial_code,
           });
         }
-
-        // Marcamos que es un usuario existente
         setIsExistingUser(true);
-
-        // Cerrar modal
         setShowValidationModal(false);
-
         showCustomAlert(
           'Datos cargados',
-          'Se han autocompletado los datos. Ahora puedes modificarlos y Guardar de nuevo.'
+          'Se autocompletaron los datos. Modifica y guarda de nuevo.'
         );
       } else {
         showCustomAlert('Error', data.message || 'No se pudo obtener datos del usuario.');
       }
-    } catch (error) {
-      showCustomAlert('Error', error.message);
+    } catch (err) {
+      showCustomAlert('Error', err.message);
     }
   };
 
-  // --------------------------------------------------------------------
-  // Validaciones
-  // --------------------------------------------------------------------
-  const validateEmail = (email) => {
-    return /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(email);
-  };
-  const validateTelefono = (telefono) => {
-    return /^[0-9]{9}$/.test(telefono);
-  };
-  const validateLoginCode = (loginCode) => {
-    return loginCode.length === 4 && !isNaN(loginCode);
-  };
-
-  // --------------------------------------------------------------------
-  // onAcceptAlert => cierra alert y, opcionalmente, navega
-  // --------------------------------------------------------------------
   const onAcceptAlert = () => {
     setAlertVisible(false);
     if (alertData.title === 'Éxito' && alertData.token) {
-      // Por ejemplo: navega al Login si así lo quieres
       navigation.navigate('Login');
     }
   };
 
-  // --------------------------------------------------------------------
-  // Render
-  // --------------------------------------------------------------------
+  let buttonLabel = 'Guardar Localmente';
+  if (firstTime || fromWelcome) {
+    if (profile.internetEnabled) {
+      buttonLabel = 'Guardar y Registrar';
+    } else {
+      buttonLabel = 'Guardar Localmente';
+    }
+  } else {
+    if (profile.internetEnabled) {
+      buttonLabel = 'Guardar y Actualizar en la Nube';
+    } else {
+      buttonLabel = 'Guardar Localmente';
+    }
+  }
+
+  const showInternetSwitch = !fromWelcome && !firstTime;
+
   return (
     <KeyboardAvoidingView style={styles.container} behavior="padding">
       <ScrollView contentContainerStyle={styles.scrollContainer}>
@@ -527,7 +499,6 @@ const ProfileScreen = ({ navigation, route }) => {
           style={styles.profileImage}
         />
 
-        {/* Nombre */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Nombre</Text>
           <TextInput
@@ -538,7 +509,6 @@ const ProfileScreen = ({ navigation, route }) => {
           />
         </View>
 
-        {/* Correo */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Correo</Text>
           <TextInput
@@ -551,7 +521,6 @@ const ProfileScreen = ({ navigation, route }) => {
           />
         </View>
 
-        {/* Teléfono + Picker de prefijo */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Teléfono</Text>
           <View style={styles.phoneInputContainer}>
@@ -574,7 +543,6 @@ const ProfileScreen = ({ navigation, route }) => {
           {errorTelefono && <Text style={styles.errorText}>{errorTelefono}</Text>}
         </View>
 
-        {/* Código de acceso */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Código de acceso (4 dígitos)</Text>
           <TextInput
@@ -587,7 +555,6 @@ const ProfileScreen = ({ navigation, route }) => {
           />
         </View>
 
-        {/* Ciudad */}
         <View style={styles.inputContainer}>
           <Text style={styles.label}>Ciudad</Text>
           <TextInput
@@ -598,20 +565,37 @@ const ProfileScreen = ({ navigation, route }) => {
           />
         </View>
 
-        {/* Switch biometría */}
         <View style={styles.inputContainer}>
           <View style={styles.switchContainer}>
             <Text style={styles.label}>Habilitar autenticación biométrica</Text>
             <Switch
               value={profile.biometricsEnabled}
-              onValueChange={(value) => toggleBiometrics(value)}
+              onValueChange={(val) => toggleBiometrics(val)}
               trackColor={{ false: '#767577', true: '#81b0ff' }}
               thumbColor={profile.biometricsEnabled ? '#155abd' : '#f4f3f4'}
             />
           </View>
         </View>
 
-        {/* Términos */}
+        {showInternetSwitch && (
+          <View style={styles.inputContainer}>
+            <View style={styles.switchContainer}>
+              <Text style={styles.label}>Usar la app con Internet</Text>
+              <Switch
+                value={profile.internetEnabled}
+                onValueChange={(val) => toggleInternetMode(val)}
+                trackColor={{ false: '#767577', true: '#81b0ff' }}
+                thumbColor={profile.internetEnabled ? '#155abd' : '#f4f3f4'}
+              />
+            </View>
+            <Text style={{ fontStyle: 'italic', color: '#333' }}>
+              {profile.internetEnabled
+                ? 'Funciona con validaciones/actualizaciones en la nube.'
+                : 'Solo guardará localmente.'}
+            </Text>
+          </View>
+        )}
+
         <View style={styles.termsContainer}>
           <CheckBox
             value={profile.termsAccepted}
@@ -627,13 +611,10 @@ const ProfileScreen = ({ navigation, route }) => {
         </View>
 
         <TouchableOpacity style={styles.button} onPress={handleSaveProfile}>
-          <Text style={styles.buttonText}>
-            {fromWelcome ? 'Guardar y Registrar' : 'Guardar Localmente'}
-          </Text>
+          <Text style={styles.buttonText}>{buttonLabel}</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      {/* Picker principal de prefijos */}
       <Modal
         transparent={true}
         visible={showCountryPicker}
@@ -650,18 +631,18 @@ const ProfileScreen = ({ navigation, route }) => {
                 <FontAwesomeIcon icon={faTimes} size={24} color="#000" />
               </TouchableOpacity>
               <ScrollView>
-                {countryDataList.map((country, index) => (
+                {countryDataList.map((c, i) => (
                   <TouchableOpacity
-                    key={index}
+                    key={i}
                     style={styles.countryItem}
                     onPress={() => {
-                      setSelectedCountry({ flag: country.flag, dial_code: country.dial_code });
-                      handleChange('prefijo', country.dial_code);
+                      setSelectedCountry({ flag: c.flag, dial_code: c.dial_code });
+                      handleChange('prefijo', c.dial_code);
                       setShowCountryPicker(false);
                     }}
                   >
                     <Text style={styles.countryText}>
-                      {country.flag} {country.name} (+{country.dial_code})
+                      {c.flag} {c.name} (+{c.dial_code})
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -671,7 +652,6 @@ const ProfileScreen = ({ navigation, route }) => {
         </TouchableWithoutFeedback>
       </Modal>
 
-      {/* Alert personalizado */}
       <CustomAlert
         visible={alertVisible}
         title={alertData.title}
@@ -681,7 +661,6 @@ const ProfileScreen = ({ navigation, route }) => {
         onAccept={onAcceptAlert}
       />
 
-      {/* Modal #1: Seleccionar si actualizar o nueva cuenta (sólo si fromWelcome) */}
       <Modal
         transparent
         animationType="slide"
@@ -692,11 +671,11 @@ const ProfileScreen = ({ navigation, route }) => {
           <View style={styles.modalOptionContainer}>
             <Text style={styles.modalTitle}>¿Ya tienes un correo registrado?</Text>
             <Text style={styles.modalMessage}>
-            Elige si deseas actualizar los datos de tu cuenta existente o crear una nueva cuenta con un correo distinto.
+              Elige si deseas actualizar los datos de tu cuenta existente
+              o crear una nueva cuenta con un correo distinto.
             </Text>
 
-            <View style={{ flexDirection: 'colum', justifyContent: 'space-around', margin: 10 }}>
-              {/* Actualizar datos => modal #2 */}
+            <View style={{ justifyContent: 'space-around', marginTop: 10 }}>
               <TouchableOpacity
                 style={[styles.optionButton, { backgroundColor: '#165bbd' }]}
                 onPress={() => {
@@ -707,9 +686,8 @@ const ProfileScreen = ({ navigation, route }) => {
                 <Text style={styles.optionButtonText}>Actualizar Datos</Text>
               </TouchableOpacity>
 
-              {/* Nueva cuenta => cerramos modal y usuario llena el form */}
               <TouchableOpacity
-                style={[styles.optionButton, { backgroundColor: '#165bbd', marginTop: 20, }]}
+                style={[styles.optionButton, { backgroundColor: '#165bbd', marginTop: 15 }]}
                 onPress={() => setShowFirstModal(false)}
               >
                 <Text style={styles.optionButtonText}>Crear Cuenta Nueva</Text>
@@ -719,7 +697,6 @@ const ProfileScreen = ({ navigation, route }) => {
         </View>
       </Modal>
 
-      {/* Modal #2: Validación => login_second (correo + prefijo + teléfono) */}
       <Modal
         transparent
         animationType="slide"
@@ -740,7 +717,6 @@ const ProfileScreen = ({ navigation, route }) => {
               Ingresa tu correo, país y teléfono registrados
             </Text>
 
-            {/* Correo */}
             <TextInput
               style={styles.input}
               placeholder="Correo existente"
@@ -749,7 +725,6 @@ const ProfileScreen = ({ navigation, route }) => {
               autoCapitalize="none"
             />
 
-            {/* Picker del prefijo en el modal #2 */}
             <TouchableOpacity
               style={[styles.countryCodeButton, { marginBottom: 10, width: '100%' }]}
               onPress={() => setShowCountryPickerValidation(true)}
@@ -759,7 +734,6 @@ const ProfileScreen = ({ navigation, route }) => {
               </Text>
             </TouchableOpacity>
 
-            {/* Teléfono */}
             <TextInput
               style={styles.input}
               placeholder="Teléfono"
@@ -778,11 +752,10 @@ const ProfileScreen = ({ navigation, route }) => {
         </View>
       </Modal>
 
-      {/* Modal para el picker del prefijo en el modal #2 */}
       <Modal
-        transparent={true}
-        visible={showCountryPickerValidation}
+        transparent
         animationType="slide"
+        visible={showCountryPickerValidation}
         onRequestClose={() => setShowCountryPickerValidation(false)}
       >
         <TouchableWithoutFeedback onPress={() => setShowCountryPickerValidation(false)}>
@@ -795,20 +768,17 @@ const ProfileScreen = ({ navigation, route }) => {
                 <FontAwesomeIcon icon={faTimes} size={24} color="#000" />
               </TouchableOpacity>
               <ScrollView>
-                {countryDataList.map((country, index) => (
+                {countryDataList.map((c, i) => (
                   <TouchableOpacity
-                    key={index}
+                    key={i}
                     style={styles.countryItem}
                     onPress={() => {
-                      setTempSelectedCountry({
-                        flag: country.flag,
-                        dial_code: country.dial_code,
-                      });
+                      setTempSelectedCountry({ flag: c.flag, dial_code: c.dial_code });
                       setShowCountryPickerValidation(false);
                     }}
                   >
                     <Text style={styles.countryText}>
-                      {country.flag} {country.name} (+{country.dial_code})
+                      {c.flag} {c.name} (+{c.dial_code})
                     </Text>
                   </TouchableOpacity>
                 ))}
@@ -821,24 +791,15 @@ const ProfileScreen = ({ navigation, route }) => {
   );
 };
 
-// --------------------------------------------------------------------
 // Validaciones
-// --------------------------------------------------------------------
-const validateEmail = (email) => {
-  return /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(email);
-};
+const validateEmail = (email) =>
+  /^[a-zA-Z0-9_.+-]+@[a-zA-Z0-9-]+\.[a-zA-Z0-9-.]+$/.test(email);
+const validateTelefono = (telefono) =>
+  /^[0-9]{9}$/.test(telefono);
+const validateLoginCode = (loginCode) =>
+  loginCode.length === 4 && !isNaN(loginCode);
 
-const validateTelefono = (telefono) => {
-  return /^[0-9]{9}$/.test(telefono);
-};
-
-const validateLoginCode = (loginCode) => {
-  return loginCode.length === 4 && !isNaN(loginCode);
-};
-
-// --------------------------------------------------------------------
 // Estilos
-// --------------------------------------------------------------------
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#f4f6f8' },
   scrollContainer: { padding: 20, alignItems: 'center' },
@@ -936,43 +897,30 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
   },
-  // Modal #1
   centeredView: {
-    flex: 1,
-    justifyContent: 'center',
+    flex: 1, justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
   },
   modalOptionContainer: {
-    width: '85%',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
+    width: '85%', backgroundColor: '#fff',
+    borderRadius: 10, padding: 20,
   },
   modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
+    fontSize: 18, fontWeight: 'bold', marginBottom: 10,
   },
   modalMessage: {
-    fontSize: 16,
-    marginBottom: 10,
+    fontSize: 16, marginBottom: 10,
   },
   optionButton: {
-    padding: 12,
-    borderRadius: 8,
+    padding: 12, borderRadius: 8,
   },
   optionButtonText: {
-    color: '#fff',
-    fontSize: 16,
-    textAlign: 'center',
+    color: '#fff', fontSize: 16, textAlign: 'center',
   },
-  // Modal #2
   modalContentSecond: {
-    width: '85%',
-    backgroundColor: '#fff',
-    borderRadius: 10,
-    padding: 20,
+    width: '85%', backgroundColor: '#fff',
+    borderRadius: 10, padding: 20,
   },
 });
 

@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Linking } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StyleSheet,
+  ActivityIndicator,
+  Linking
+} from 'react-native';
 import RNFS from 'react-native-fs';
 import { zip, unzip } from 'react-native-zip-archive';
 import Share from 'react-native-share';
@@ -19,11 +26,10 @@ const RestoreBackupScreen = () => {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertData, setAlertData] = useState({ title: '', message: '' });
 
-  // --------- NUEVOS estados para confirmar restauraciones -------------
+  // Alerta de confirmación para restaurar
   const [showRestoreConfirm, setShowRestoreConfirm] = useState(false);
   const [restoreAction, setRestoreAction] = useState(null);
   const [restoreMessage, setRestoreMessage] = useState('');
-  // --------------------------------------------------------------------
 
   // Función para mostrar la alerta genérica
   const showCustomAlert = (title, message) => {
@@ -64,7 +70,7 @@ const RestoreBackupScreen = () => {
       const backupDate = new Date().toLocaleDateString();
       setBackupCreated({
         path: resultPath,
-        name: `Backup - ${backupDate}.zip`,
+        name: `Backup Local - ${backupDate}.zip`,
       });
 
       showCustomAlert('Éxito', 'Backup creado correctamente.');
@@ -77,7 +83,8 @@ const RestoreBackupScreen = () => {
   };
 
   // ---------------------------------------------------
-  // 2. CARGAR BACKUP (desde DocumentPicker) CON CONFIRMACIÓN
+  // 2. CARGAR BACKUP (desde DocumentPicker) 
+  //    *NO* se restaura automáticamente
   // ---------------------------------------------------
   const loadBackup = async () => {
     setLoading(true);
@@ -97,53 +104,21 @@ const RestoreBackupScreen = () => {
         const sourcePath = pickedZipUri.replace('file://', '');
         await RNFS.copyFile(sourcePath, localZipPath);
 
-        // Aquí el ejemplo de "restauración inmediata"
-        // Podrías quitarlo si deseas únicamente tener el ZIP guardado.
-        const tempZipPath = `${RNFS.TemporaryDirectoryPath}/backup_temp.zip`;
-        await RNFS.copyFile(localZipPath, tempZipPath);
-
-        const unzipPath = `${RNFS.DocumentDirectoryPath}/DocSafe`;
-        await unzip(tempZipPath, unzipPath);
-        await RNFS.unlink(tempZipPath);
-
-        const extractedFiles = await RNFS.readDir(unzipPath);
-        const assetsPath = `${RNFS.DocumentDirectoryPath}/assets`;
-
-        const assetsExists = await RNFS.exists(assetsPath);
-        if (!assetsExists) {
-          await RNFS.mkdir(assetsPath);
-        }
-
-        for (const file of extractedFiles) {
-          if (file.name.endsWith('.json')) {
-            const jsonSource = `${unzipPath}/${file.name}`;
-            const jsonDestination = `${assetsPath}/${file.name}`;
-
-            const jsonExists = await RNFS.exists(jsonDestination);
-            if (jsonExists) {
-              await RNFS.unlink(jsonDestination);
-            }
-
-            await RNFS.moveFile(jsonSource, jsonDestination);
-            console.log(`Archivo JSON movido a assets: ${file.name}`);
-          } else {
-            console.log(`Archivo multimedia mantenido en Wallet DS: ${file.name}`);
-          }
-        }
-
+        // Aquí SOLO cargamos el ZIP, sin restaurarlo inmediatamente
         setBackupLoaded({
           path: localZipPath,
-          name: `Backup Cargado - ${new Date().toLocaleDateString()}.zip`,
+          // Usamos el nombre original o podemos personalizarlo
+          name: result[0].name || `backup_loaded_${timestamp}.zip`,
         });
 
-        showCustomAlert('Éxito', 'Backup restaurado correctamente.');
+        showCustomAlert('Backup Cargado', 'El archivo se ha cargado correctamente. Ahora puedes restaurarlo si deseas.');
       }
     } catch (error) {
       if (DocumentPicker.isCancel(error)) {
         console.log('Usuario canceló la selección del backup');
       } else {
-        console.error('Error al restaurar el backup:', error);
-        showCustomAlert('Error', 'No se pudo restaurar el backup.');
+        console.error('Error al cargar el backup:', error);
+        showCustomAlert('Error', 'No se pudo cargar el backup.');
       }
     } finally {
       setLoading(false);
@@ -205,7 +180,7 @@ const RestoreBackupScreen = () => {
   };
 
   // ---------------------------------------------------
-  // 4. COMPARTIR BACKUP (generalmente el creado)
+  // 4. COMPARTIR BACKUP (generalmente el creado o cargado)
   // ---------------------------------------------------
   const shareBackup = async (backup) => {
     if (!backup?.path) {
@@ -228,11 +203,7 @@ const RestoreBackupScreen = () => {
   // Renderiza visualmente cada backup
   const renderBackupItem = (backup, label) => (
     <View style={styles.backupItem}>
-      <Text
-        style={styles.backupName}
-        numberOfLines={1}
-        ellipsizeMode="tail"
-      >
+      <Text style={styles.backupName}>
         {label}: {backup?.name || ''}
       </Text>
 
@@ -263,7 +234,7 @@ const RestoreBackupScreen = () => {
 
   return (
     <View style={styles.container}>
-      {loading && <ActivityIndicator size="large" color="#185abd" />}
+      {loading && <ActivityIndicator size="large" color="#185abd" style={{ marginBottom: 10 }} />}
 
       <View style={styles.buttonContainer}>
         {/* 1) Botón Crear Backup */}
@@ -278,15 +249,10 @@ const RestoreBackupScreen = () => {
         {/* Mostrar backup creado si existe */}
         {backupCreated && renderBackupItem(backupCreated, 'Backup Creado')}
 
-        {/* 2) Botón Cargar Backup (con confirmación previa) */}
+        {/* 2) Botón Cargar Backup (solo carga, NO restaura) */}
         <TouchableOpacity
           style={[styles.actionButton, styles.importButton]}
-          onPress={() =>
-            askRestoreConfirmation(
-              'Al cargar un backup se sobreescribirán los archivos actuales. ¿Desea continuar?',
-              () => loadBackup()
-            )
-          }
+          onPress={loadBackup}
         >
           <FontAwesomeIcon icon={faFileImport} size={20} color="#ffffff" />
           <Text style={styles.buttonText}>Cargar Backup</Text>
@@ -422,7 +388,8 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     flex: 1,
     marginRight: 10,
-    overflow: 'hidden',
+    // Quitar numberOfLines => permitir varias líneas
+    flexWrap: 'wrap',
   },
   buttonGroup: {
     flexDirection: 'row',

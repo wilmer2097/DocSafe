@@ -25,7 +25,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         // No hay cuenta registrada
         showCustomAlert(
           'Cuenta inexistente',
-          'No se encontró ninguna cuenta registrada. Por favor, crea una cuenta antes de intentar recuperar el Token.'
+          'No se ha encontrado ninguna cuenta registrada en este dispositivo. Si estás utilizando un dispositivo nuevo, por favor crea una cuenta o actualiza tu información en la sección "Crear cuenta".'
         );
         return;
       }
@@ -58,6 +58,9 @@ const ForgotPasswordScreen = ({ navigation }) => {
     if (isSuccess) {
       // Navegar a la pantalla de Login solo si fue exitoso
       navigation.navigate('Login');
+    } else if (alertData.message === 'No se ha encontrado ninguna cuenta registrada en este dispositivo. Si estás utilizando un dispositivo nuevo, por favor crea una cuenta o actualiza tu información en la sección "Crear cuenta".') {
+      // Navegar a la pantalla Profile si el correo no coincide
+      navigation.navigate('Profile',{ fromWelcome: true });
     }
   };
 
