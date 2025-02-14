@@ -741,7 +741,7 @@ const finalizeImageSelection = async (imagePath, fileType) => {
           placeholder="Nombre del documento"
           value={name}
           onChangeText={setName}
-          placeholderTextColor="#9a9a9a"
+          placeholderTextColor="#888"
         />
       </View>
 
@@ -759,7 +759,7 @@ const finalizeImageSelection = async (imagePath, fileType) => {
           value={description}
           onChangeText={setDescription}
           multiline
-          placeholderTextColor="#9a9a9a"
+          placeholderTextColor="#888"
         />
       </View>
 
@@ -772,7 +772,7 @@ const finalizeImageSelection = async (imagePath, fileType) => {
             placeholder="URL (Opcional)"
             value={url}
             onChangeText={setUrl}
-            placeholderTextColor="#9a9a9a"
+            placeholderTextColor="#888"
           />
           <FontAwesomeIcon icon={faLink} size={24} color="#185abd" />
         </View>

@@ -225,6 +225,7 @@ const LoginScreen = ({ navigation }) => {
                 onChangeText={setEmail}
                 keyboardType="email-address"
                 autoCapitalize="none"
+                placeholderTextColor="#888"
               />
             )}
             <Text style={styles.title}>Ingresa tu Token ID</Text>

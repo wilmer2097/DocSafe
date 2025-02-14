@@ -598,7 +598,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
             placeholder="Nombre del documento"
             value={documentName}
             onChangeText={setDocumentName}
-            placeholderTextColor="#9a9a9a"
+            placeholderTextColor="#888"
           />
         </View>
 
@@ -632,7 +632,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
             value={description}
             onChangeText={setDescription}
             multiline
-            placeholderTextColor="#9a9a9a"
+            placeholderTextColor="#888"
           />
         </View>
 
@@ -645,7 +645,7 @@ const AddDocumentForm = ({ onClose, onDocumentAdded }) => {
               placeholder="URL (Opcional)"
               value={url}
               onChangeText={(text) => setUrl(text.toLowerCase())}
-              placeholderTextColor="#9a9a9a"
+              placeholderTextColor="#888"
             />
             <FontAwesomeIcon icon={faLink} size={24} color="#185abd" />
           </View>

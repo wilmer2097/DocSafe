@@ -3,13 +3,30 @@ import { createDrawerNavigator } from '@react-navigation/drawer';
 import { createStackNavigator } from '@react-navigation/stack';
 import { NavigationContainer } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { View, Text, Image, StyleSheet, TouchableOpacity, Alert, SafeAreaView, Linking, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  TouchableOpacity,
+  Alert,
+  SafeAreaView,
+  Linking,
+  ScrollView
+} from 'react-native';
 import RNFS from 'react-native-fs';
+import { FontAwesomeIcon } from '@fortawesome/react-native-fontawesome';
 import {
-  FontAwesomeIcon
-} from '@fortawesome/react-native-fontawesome';
-import {
-  faFolder, faCog, faInfoCircle, faSignOutAlt, faTrashAlt, faArrowLeft, faHome, faUser, faQuestionCircle, faFileExport
+  faFolder,
+  faCog,
+  faInfoCircle,
+  faSignOutAlt,
+  faTrashAlt,
+  faArrowLeft,
+  faHome,
+  faUser,
+  faQuestionCircle,
+  faFileExport
 } from '@fortawesome/free-solid-svg-icons';
 
 import HomeScreen from './HomeScreen';
@@ -23,6 +40,9 @@ import DocumentDetail from './DocumentDetail';
 import ForgotPasswordScreen from './ForgotPasswordScreen';
 import RestoreBackupScreen from './RestoreBackupScreen';
 
+// Asegúrate de importar tu alerta personalizada
+import CustomAlert from './CustomAlert'; // Ajusta la ruta si es necesario
+
 const Drawer = createDrawerNavigator();
 const Stack = createStackNavigator();
 
@@ -31,6 +51,9 @@ const CustomDrawerContent = (props) => {
     name: 'Admin',
     profileImage: require('../src/presentation/assets/Logo.jpg'),
   });
+
+  // Estado para mostrar la alerta de confirmación de Logout
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -44,7 +67,9 @@ const CustomDrawerContent = (props) => {
 
           setProfile({
             name: perfilUsuario.name || 'Admin',
-            profileImage: perfilUsuario.profileImage ? { uri: perfilUsuario.profileImage } : require('../src/presentation/assets/Logo.jpg'),
+            profileImage: perfilUsuario.profileImage
+              ? { uri: perfilUsuario.profileImage }
+              : require('../src/presentation/assets/Logo.jpg'),
           });
         }
       } catch (error) {
@@ -55,74 +80,178 @@ const CustomDrawerContent = (props) => {
     loadProfile();
   }, []);
 
+  // Función que borra (o limpia) los archivos locales y navega a Welcome
+  const handleConfirmLogout = async () => {
+    try {
+      // 1) Borrar o limpiar perfilUsuario.json
+      const profilePath = `${RNFS.DocumentDirectoryPath}/perfilUsuario.json`;
+      const existsProfile = await RNFS.exists(profilePath);
+      if (existsProfile) {
+        await RNFS.unlink(profilePath);
+      }
+
+      // 2) Borrar o limpiar archivos.json (si también quieres “resetear” la lista de documentos)
+      const assetsPath = `${RNFS.DocumentDirectoryPath}/assets/archivos.json`;
+      const existsAssets = await RNFS.exists(assetsPath);
+      if (existsAssets) {
+        await RNFS.unlink(assetsPath);
+      }
+
+      // 3) Regresar a la pantalla de Welcome, reseteando la navegación
+      props.navigation.reset({
+        index: 0,
+        routes: [{ name: 'Welcome' }],
+      });
+    } catch (error) {
+      console.error('Error al cerrar sesión:', error);
+      Alert.alert('Error', 'Ocurrió un problema al cerrar sesión.');
+    }
+  };
+
+  // Muestra la alerta de confirmación
+  const handleLogoutPress = () => {
+    setShowLogoutConfirm(true);
+  };
+
   return (
-    <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-    <SafeAreaView style={styles.drawerContent}>
-      <View style={styles.profileSection}>
-        <TouchableOpacity style={styles.profileImageContainer} onPress={() => props.navigation.navigate('Profile')}>
-          <Image source={profile.profileImage} style={styles.profileImage} />
+    <ScrollView
+      contentContainerStyle={styles.scrollContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <SafeAreaView style={styles.drawerContent}>
+        <View style={styles.profileSection}>
+          <TouchableOpacity
+            style={styles.profileImageContainer}
+            onPress={() => props.navigation.navigate('Profile')}
+          >
+            <Image source={profile.profileImage} style={styles.profileImage} />
+          </TouchableOpacity>
+          <Text style={styles.profileName}>{profile.name}</Text>
+          <Text style={styles.profileRole}>Wallet DS</Text>
+        </View>
+
+        <View style={styles.menuItems}>
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => props.navigation.navigate('Documentos')}
+          >
+            <View style={styles.iconAndText}>
+              <FontAwesomeIcon
+                icon={faFolder}
+                size={20}
+                color="#185abd"
+                style={styles.menuIcon}
+              />
+              <Text style={styles.menuText}>Documentos</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => props.navigation.navigate('Configuración')}
+          >
+            <View style={styles.iconAndText}>
+              <FontAwesomeIcon
+                icon={faCog}
+                size={20}
+                color="#185abd"
+                style={styles.menuIcon}
+              />
+              <Text style={styles.menuText}>Configuración</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => props.navigation.navigate('Guía de Uso')}
+          >
+            <View style={styles.iconAndText}>
+              <FontAwesomeIcon
+                icon={faQuestionCircle}
+                size={20}
+                color="#185abd"
+                style={styles.menuIcon}
+              />
+              <Text style={styles.menuText}>Ayuda</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Ejemplo de TestScreen (comentado) */}
+          {/* 
+          <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('TestScreen')}>
+            <View style={styles.iconAndText}>
+              <FontAwesomeIcon icon={faQuestionCircle} size={20} color="#185abd" style={styles.menuIcon} />
+              <Text style={styles.menuText}>TestScreen</Text>
+            </View>
+          </TouchableOpacity> 
+          */}
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => props.navigation.navigate('Copia Backup')}
+          >
+            <View style={styles.iconAndText}>
+              <FontAwesomeIcon
+                icon={faFileExport}
+                size={20}
+                color="#185abd"
+                style={styles.menuIcon}
+              />
+              <Text style={styles.menuText}>Copia Backup</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.menuItem}
+            onPress={() => Linking.openURL('https://solucionestecperu.com/contactos.html')}
+            accessibilityLabel="Creado por STEC Perú, fábrica de software, enlace a la página de contactos"
+          >
+            <View style={styles.iconAndText}>
+              <FontAwesomeIcon
+                icon={faInfoCircle}
+                size={20}
+                color="#185abd"
+                style={styles.menuIcon}
+              />
+              <Text style={styles.menuText}>Creado Por</Text>
+            </View>
+            <View style={styles.infoContainer}>
+              <Text style={styles.creatorText}>STEC - Perú</Text>
+              <Text style={styles.subText}>Fábrica de software</Text>
+              <Text style={styles.yearText}>© 2024</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Botón para Cerrar Sesión => muestra alerta de confirmación */}
+        <TouchableOpacity style={styles.logoutButton} onPress={handleLogoutPress}>
+          <FontAwesomeIcon
+            icon={faSignOutAlt}
+            size={20}
+            color="#ffffff"
+            style={styles.menuIcon}
+          />
+          <Text style={styles.logoutText}>Cerrar Sesión</Text>
         </TouchableOpacity>
-        <Text style={styles.profileName}>{profile.name}</Text>
-        <Text style={styles.profileRole}>Wallet DS</Text>
-      </View>
+      </SafeAreaView>
 
-      <View style={styles.menuItems}>
-        <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Documentos')}>
-          <View style={styles.iconAndText}>
-            <FontAwesomeIcon icon={faFolder} size={20} color="#185abd" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Documentos</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Configuración')}>
-          <View style={styles.iconAndText}>
-            <FontAwesomeIcon icon={faCog} size={20} color="#185abd" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Configuración</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Guía de Uso')}>
-          <View style={styles.iconAndText}>
-            <FontAwesomeIcon icon={faQuestionCircle} size={20} color="#185abd" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Ayuda</Text>
-          </View>
-        </TouchableOpacity>
-
-        {/* <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('TestScreen')}>
-          <View style={styles.iconAndText}>
-            <FontAwesomeIcon icon={faQuestionCircle} size={20} color="#185abd" style={styles.menuIcon} />
-            <Text style={styles.menuText}>TestScreen</Text>
-          </View>
-        </TouchableOpacity>  */}
-
-        <TouchableOpacity style={styles.menuItem} onPress={() => props.navigation.navigate('Copia Backup')}>
-          <View style={styles.iconAndText}>
-            <FontAwesomeIcon icon={faFileExport} size={20} color="#185abd" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Copia Backup</Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity 
-          style={styles.menuItem} 
-          onPress={() => Linking.openURL('https://solucionestecperu.com/contactos.html')}
-          accessibilityLabel="Creado por STEC Perú, fábrica de software, enlace a la página de contactos">
-          <View style={styles.iconAndText}>
-            <FontAwesomeIcon icon={faInfoCircle} size={20} color="#185abd" style={styles.menuIcon} />
-            <Text style={styles.menuText}>Creado Por</Text>
-          </View>
-          <View style={styles.infoContainer}>
-            <Text style={styles.creatorText}>STEC - Perú</Text>
-            <Text style={styles.subText}>Fábrica de software</Text>
-            <Text style={styles.yearText}>© 2024</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-
-      <TouchableOpacity style={styles.logoutButton} onPress={() => props.navigation.navigate('Login')}>
-        <FontAwesomeIcon icon={faSignOutAlt} size={20} color="#ffffff" style={styles.menuIcon} />
-        <Text style={styles.logoutText}>Cerrar Sesión</Text>
-      </TouchableOpacity>
-    </SafeAreaView>
+      {/* Alerta personalizada de confirmación de logout */}
+      <CustomAlert
+        visible={showLogoutConfirm}
+        title="Cerrar Sesión"
+        message="Esta acción borrará tu información local y te llevará a la pantalla de bienvenida. ¿Deseas continuar?"
+        // Mostramos botón Cancelar
+        showCancel={true}
+        // Al aceptar, hacemos el borrado y navegamos
+        onAccept={() => {
+          handleConfirmLogout();
+          setShowLogoutConfirm(false);
+        }}
+        // Al cancelar, solo cerramos la alerta
+        onCancel={() => setShowLogoutConfirm(false)}
+        // También cerramos si se pulsa la 'X' o background
+        onClose={() => setShowLogoutConfirm(false)}
+      />
     </ScrollView>
   );
 };
@@ -145,8 +274,8 @@ const DrawerNavigator = () => {
         },
       }}
     >
-      <Drawer.Screen 
-        name="Wallet DS" 
+      <Drawer.Screen
+        name="Wallet DS"
         component={HomeScreen}
         options={{
           title: 'Documentos',
@@ -155,8 +284,8 @@ const DrawerNavigator = () => {
           ),
         }}
       />
-      <Drawer.Screen 
-        name="Documentos" 
+      <Drawer.Screen
+        name="Documentos"
         component={HomeScreen}
         options={{
           drawerIcon: ({ color, size }) => (
@@ -164,8 +293,8 @@ const DrawerNavigator = () => {
           ),
         }}
       />
-      <Drawer.Screen 
-        name="Perfil" 
+      <Drawer.Screen
+        name="Perfil"
         component={ProfileScreen}
         options={{
           drawerIcon: ({ color, size }) => (
@@ -173,8 +302,8 @@ const DrawerNavigator = () => {
           ),
         }}
       />
-      <Drawer.Screen 
-        name="Configuración" 
+      <Drawer.Screen
+        name="Configuración"
         component={ProfileScreen}
         options={{
           drawerIcon: ({ color, size }) => (
@@ -182,8 +311,8 @@ const DrawerNavigator = () => {
           ),
         }}
       />
-      <Drawer.Screen 
-        name="Guía de Uso" 
+      <Drawer.Screen
+        name="Guía de Uso"
         component={HelpScreen}
         options={{
           drawerIcon: ({ color, size }) => (
@@ -191,8 +320,8 @@ const DrawerNavigator = () => {
           ),
         }}
       />
-      <Drawer.Screen 
-        name="TestScreen" 
+      <Drawer.Screen
+        name="TestScreen"
         component={TestScreen}
         options={{
           drawerIcon: ({ color, size }) => (
@@ -200,8 +329,8 @@ const DrawerNavigator = () => {
           ),
         }}
       />
-      <Drawer.Screen 
-        name="Archivados" 
+      <Drawer.Screen
+        name="Archivados"
         component={ArchivedDocuments}
         options={{
           drawerIcon: ({ color, size }) => (
@@ -209,8 +338,8 @@ const DrawerNavigator = () => {
           ),
         }}
       />
-      <Drawer.Screen 
-        name="Copia Backup" 
+      <Drawer.Screen
+        name="Copia Backup"
         component={RestoreBackupScreen} // Componente unificado
         options={{
           drawerIcon: ({ color, size }) => (
@@ -240,7 +369,7 @@ const AppNavigator = ({ initialRoute }) => {
   }, []);
 
   if (firstTimeUser === null) {
-    return null; // Puedes agregar un loading spinner aquí mientras se carga el estado
+    return null; // Puedes colocar un spinner de carga mientras se determina
   }
   return (
     <NavigationContainer>
@@ -256,40 +385,55 @@ const AppNavigator = ({ initialRoute }) => {
           },
         }}
       >
-        <Stack.Screen name="Welcome" component={WelcomeScreen} options={{ headerShown: false }} />
-        <Stack.Screen name="Login" component={LoginScreen} options={{ headerShown: false }} />
-        <Stack.Screen 
-          name="ForgotPassword" 
-          component={ForgotPasswordScreen} 
-          options={{ 
+        <Stack.Screen
+          name="Welcome"
+          component={WelcomeScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+        <Stack.Screen
+          name="ForgotPassword"
+          component={ForgotPasswordScreen}
+          options={{
             title: 'Recuperar Contraseña',
             headerLeft: (props) => (
               <TouchableOpacity {...props} style={styles.headerIcon}>
                 <FontAwesomeIcon icon={faArrowLeft} size={24} color="#ffffff" />
               </TouchableOpacity>
             ),
-          }} 
+          }}
         />
-        <Stack.Screen 
-          name="Profile" 
-          component={ProfileScreen} 
-          options={{ 
+        <Stack.Screen
+          name="Profile"
+          component={ProfileScreen}
+          options={{
             title: 'Completa tu Perfil',
             headerLeft: (props) => (
               <TouchableOpacity {...props} style={styles.headerIcon}>
                 <FontAwesomeIcon icon={faArrowLeft} size={24} color="#ffffff" />
               </TouchableOpacity>
             ),
-          }} 
+          }}
         />
-        <Stack.Screen name="Home" component={DrawerNavigator} options={{ headerShown: false }} />
+        <Stack.Screen
+          name="Home"
+          component={DrawerNavigator}
+          options={{ headerShown: false }}
+        />
         <Stack.Screen
           name="DocumentDetail"
           component={DocumentDetail}
           options={({ navigation }) => ({
             title: 'Detalles del Documento',
             headerLeft: () => (
-              <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerIcon}>
+              <TouchableOpacity
+                onPress={() => navigation.goBack()}
+                style={styles.headerIcon}
+              >
                 <FontAwesomeIcon icon={faArrowLeft} size={24} color="#ffffff" />
               </TouchableOpacity>
             ),
@@ -313,7 +457,7 @@ const AppNavigator = ({ initialRoute }) => {
 const styles = StyleSheet.create({
   drawerContent: {
     flex: 1,
-    backgroundColor: '#f5f5f5', 
+    backgroundColor: '#f5f5f5',
     justifyContent: 'space-between',
   },
   scrollContent: {
@@ -355,11 +499,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   iconAndText: {
-    flexDirection: 'row', 
-    alignItems: 'center', 
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   menuIcon: {
-    marginRight: 15,  
+    marginRight: 15,
   },
   menuText: {
     fontSize: 16,
@@ -384,23 +528,23 @@ const styles = StyleSheet.create({
     padding: 10,
   },
   infoContainer: {
-    marginLeft: 25,         
+    marginLeft: 25,
   },
   creatorText: {
     marginLeft: 10,
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#185abd'
+    color: '#185abd',
   },
   subText: {
     marginLeft: 10,
     fontSize: 14,
-    color: '#666666',  
+    color: '#666666',
   },
   yearText: {
     marginLeft: 10,
     fontSize: 12,
-    color: '#999999',    
+    color: '#999999',
   },
 });
 

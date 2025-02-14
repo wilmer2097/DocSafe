@@ -506,6 +506,7 @@ const ProfileScreen = ({ navigation, route }) => {
             placeholder="Nombre"
             value={profile.name}
             onChangeText={(text) => handleChange('name', text)}
+            placeholderTextColor="#888"
           />
         </View>
 
@@ -517,7 +518,7 @@ const ProfileScreen = ({ navigation, route }) => {
             value={profile.correo}
             onChangeText={(text) => handleChange('correo', text)}
             keyboardType="email-address"
-            placeholderTextColor="#999"
+            placeholderTextColor="#888"
           />
         </View>
 
@@ -538,6 +539,7 @@ const ProfileScreen = ({ navigation, route }) => {
               value={profile.telefono}
               onChangeText={(text) => handleChange('telefono', text)}
               keyboardType="phone-pad"
+              placeholderTextColor="#888"
             />
           </View>
           {errorTelefono && <Text style={styles.errorText}>{errorTelefono}</Text>}
@@ -552,6 +554,7 @@ const ProfileScreen = ({ navigation, route }) => {
             onChangeText={(text) => handleChange('loginCode', text)}
             keyboardType="numeric"
             maxLength={4}
+            placeholderTextColor="#888"
           />
         </View>
 
@@ -562,6 +565,7 @@ const ProfileScreen = ({ navigation, route }) => {
             placeholder="Ciudad"
             value={profile.ciudad}
             onChangeText={(text) => handleChange('ciudad', text)}
+            placeholderTextColor="#888"
           />
         </View>
 
@@ -713,7 +717,7 @@ const ProfileScreen = ({ navigation, route }) => {
             </TouchableOpacity>
 
             <Text style={styles.modalTitle}>Validar Datos Existentes</Text>
-            <Text style={{ marginBottom: 10 }}>
+            <Text style={styles.modalMessage}>
               Ingresa tu correo, país y teléfono registrados
             </Text>
 
@@ -723,6 +727,7 @@ const ProfileScreen = ({ navigation, route }) => {
               value={tempEmail}
               onChangeText={setTempEmail}
               autoCapitalize="none"
+              placeholderTextColor="#888"
             />
 
             <TouchableOpacity
@@ -740,6 +745,7 @@ const ProfileScreen = ({ navigation, route }) => {
               value={tempPhone}
               onChangeText={setTempPhone}
               keyboardType="phone-pad"
+              placeholderTextColor="#888"
             />
 
             <TouchableOpacity
@@ -907,10 +913,10 @@ const styles = StyleSheet.create({
     borderRadius: 10, padding: 20,
   },
   modalTitle: {
-    fontSize: 18, fontWeight: 'bold', marginBottom: 10,
+    fontSize: 18, fontWeight: 'bold', marginBottom: 10, color: 'black',
   },
   modalMessage: {
-    fontSize: 16, marginBottom: 10,
+    fontSize: 14, marginBottom: 10, color: 'gray',
   },
   optionButton: {
     padding: 12, borderRadius: 8,

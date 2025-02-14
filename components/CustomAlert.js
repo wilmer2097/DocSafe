@@ -81,14 +81,14 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   title: {
-    color: '#333',
+    color: 'black',
     fontSize: 20,
     fontWeight: 'bold',
     marginBottom: 10,
     textAlign: 'center',
   },
   message: {
-    color: '#555',
+    color: '#888',
     fontSize: 16,
     marginBottom: 15,
     textAlign: 'center',
@@ -128,7 +128,7 @@ const styles = StyleSheet.create({
     minWidth: 100,
   },
   cancelButton: {
-    backgroundColor: '#cc0000', // Por ejemplo, un color gris
+    backgroundColor: '#cc0000', 
   },
   buttonText: {
     color: '#fff',

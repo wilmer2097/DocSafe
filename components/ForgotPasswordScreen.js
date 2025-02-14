@@ -73,7 +73,7 @@ const ForgotPasswordScreen = ({ navigation }) => {
         value={email}
         onChangeText={(text) => setEmail(text)}
         keyboardType="email-address"
-        placeholderTextColor="#999"
+        placeholderTextColor="#888"
       />
       <TouchableOpacity style={styles.button} onPress={handlePasswordReset}>
         <Text style={styles.buttonText}>Mostrar Token ID</Text>
